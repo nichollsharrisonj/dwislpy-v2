@@ -45,6 +45,8 @@
 %token               INDT
 %token               DEDT
 %token               COLN ":"
+%token               COMA ","
+%token               DEFN "def"
 %token               PASS "pass"
 %token               WHLE "while"
 %token               IFTN "if"

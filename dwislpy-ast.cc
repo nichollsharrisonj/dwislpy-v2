@@ -110,11 +110,6 @@ void Prgm::run(void) const {
     main->exec(defs,main_ctxt);
 }
 
-std::optional<Valu> Defn::exec(const Defs& defs, Ctxt& ctxt) const {
-    //defs[name] = nest->exec(defs,ctxt); // ???
-    return std::nullopt;
-}
-
 std::optional<Valu> Nest::exec(const Defs& defs, Ctxt& ctxt) const {
     std::optional<Valu> rv = blck->exec(defs,ctxt);
     if (rv.has_value()) {

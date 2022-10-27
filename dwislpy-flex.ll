@@ -353,6 +353,7 @@ WSPC    {INDT}
     return issue(token::Token_STRG,txt,loc);
 }
 
+
 <MID_LINE>"=" {
     return issue(token::Token_ASGN,yytext,loc);
 }
@@ -419,6 +420,14 @@ WSPC    {INDT}
 
 <MID_LINE>"%" {
     return issue(token::Token_IMOD,yytext,loc);
+}
+
+<MID_LINE>"," {
+    return issue(token::Token_COMA,yytext,loc);
+}
+
+<MID_LINE>def {
+    return issue(token::Token_DEFN,yytext,loc);
 }
     
 <MID_LINE>print {

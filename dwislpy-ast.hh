@@ -219,7 +219,7 @@ public:
     Defn(Name x, Name_vec y, Nest_ptr z, Locn lo) : AST {lo}, name {x}, prms {y}, nest {z} { } 
     virtual ~Defn(void) = default;
     //
-    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const = 0;
+    // virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const = 0;
     virtual void dump(int level = 0) const;
     virtual void output(std::ostream& os) const; // Output formatted code.
 };
