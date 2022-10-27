@@ -13,6 +13,25 @@
 #include "dwislpy-util.hh"
 
 //
+// predicate function for Valu
+//
+bool predicate(Valu e) {
+    if (std::holds_alternative<int>(e)) {
+        int i = std::get<int>(e);
+        return (bool)i;
+    }
+    if (std::holds_alternative<bool>(e)) {
+        bool b = std::get<bool>(e);
+        return b;
+    }
+    if (std::holds_alternative<std::string>(e)) {
+        std::string s = std::get<std::string>(e);
+        return !(s.compare("") == 0);
+    }
+    return false;
+}
+
+//
 // dwislpy-ast.cc
 //
 // Below are the implementations of methods for AST nodes. They are organized
@@ -91,6 +110,18 @@ void Prgm::run(void) const {
     main->exec(defs,main_ctxt);
 }
 
+std::optional<Valu> Defn::exec(const Defs& defs, Ctxt& ctxt) const {
+    //defs[name] = nest->exec(defs,ctxt); // ???
+    return std::nullopt;
+}
+
+std::optional<Valu> Nest::exec(const Defs& defs, Ctxt& ctxt) const {
+    std::optional<Valu> rv = blck->exec(defs,ctxt);
+    if (rv.has_value()) {
+        return rv;
+    } 
+    return std::nullopt;
+}
 
 std::optional<Valu> Blck::exec(const Defs& defs, Ctxt& ctxt) const {
     for (Stmt_ptr s : stmts) {
@@ -108,6 +139,59 @@ std::optional<Valu> Asgn::exec(const Defs& defs,
     return std::nullopt;
 }
 
+std::optional<Valu> PlEq::exec(const Defs& defs,
+                               Ctxt& ctxt) const {
+    // from Lkup
+    if (ctxt.count(name) <= 0) {
+        std::string msg = "Run-time error: variable '" + name +"'";
+        msg += "not defined.";
+        throw DwislpyError { where(), msg };
+    }
+
+    Valu n = ctxt.at(name);
+    Valu e = expn->eval(defs,ctxt);
+    
+    if (std::holds_alternative<int>(e) &&
+        std::holds_alternative<int>(n)) {
+        int in = std::get<int>(n);
+        int ie = std::get<int>(e);
+        ctxt[name] = Valu {in + ie};
+    } else if (std::holds_alternative<std::string>(e) &&
+               std::holds_alternative<std::string>(n)) {
+        std::string sn = std::get<std::string>(n);
+        std::string se = std::get<std::string>(e);
+        ctxt[name] = Valu {sn + se};
+    } else {
+        std::string msg = "Run-time error: wrong operand type for plus equals.";
+        throw DwislpyError { where(), msg };
+    }        
+    return std::nullopt;
+}
+
+std::optional<Valu> MiEq::exec(const Defs& defs,
+                               Ctxt& ctxt) const {
+    // from Lkup
+    if (ctxt.count(name) <= 0) {
+        std::string msg = "Run-time error: variable '" + name +"'";
+        msg += "not defined.";
+        throw DwislpyError { where(), msg };
+    }
+
+    Valu n = ctxt.at(name);
+    Valu e = expn->eval(defs,ctxt);
+    
+    if (std::holds_alternative<int>(e) &&
+        std::holds_alternative<int>(n)) {
+        int in = std::get<int>(n);
+        int ie = std::get<int>(e);
+        ctxt[name] = Valu {in - ie};
+    } else {
+        std::string msg = "Run-time error: wrong operand type for minus equals.";
+        throw DwislpyError { where(), msg };
+    }        
+    return std::nullopt;
+}
+
 std::optional<Valu> Pass::exec([[maybe_unused]] const Defs& defs,
                                [[maybe_unused]] Ctxt& ctxt) const {
     // does nothing!
@@ -116,6 +200,31 @@ std::optional<Valu> Pass::exec([[maybe_unused]] const Defs& defs,
   
 std::optional<Valu> Prnt::exec(const Defs& defs, Ctxt& ctxt) const {
     std::cout << to_string(expn->eval(defs,ctxt)) << std::endl;
+    return std::nullopt;
+}
+
+std::optional<Valu> Whle::exec(const Defs& defs, Ctxt& ctxt) const {
+    while (predicate(expn->eval(defs,ctxt))) {
+        std::optional<Valu> rv = nest->exec(defs,ctxt);
+        if (rv.has_value()) {
+            return rv;
+        } 
+    }
+    return std::nullopt;
+}
+
+std::optional<Valu> Tern::exec(const Defs& defs, Ctxt& ctxt) const {
+    if (predicate(expn->eval(defs,ctxt))) {
+        std::optional<Valu> rv = nest_if->exec(defs,ctxt);
+        if (rv.has_value()) {
+            return rv;
+        } 
+    } else {
+        std::optional<Valu> rv = nest_else->exec(defs,ctxt);
+        if (rv.has_value()) {
+            return rv;
+        } 
+    }
     return std::nullopt;
 }
 
@@ -143,6 +252,71 @@ Valu Plus::eval(const Defs& defs, const Ctxt& ctxt) const {
         std::string msg = "Run-time error: wrong operand type for plus.";
         throw DwislpyError { where(), msg };
     }        
+}
+
+Valu Conj::eval(const Defs& defs, const Ctxt& ctxt) const {
+    Valu lv = left->eval(defs,ctxt);
+    Valu rv = rght->eval(defs,ctxt);
+    return predicate(lv) && predicate(rv);
+}
+
+Valu Disj::eval(const Defs& defs, const Ctxt& ctxt) const {
+    Valu lv = left->eval(defs,ctxt);
+    Valu rv = rght->eval(defs,ctxt);
+    return predicate(lv) || predicate(rv);
+}
+
+Valu Less::eval(const Defs& defs, const Ctxt& ctxt) const {
+    Valu lv = left->eval(defs,ctxt);
+    Valu rv = rght->eval(defs,ctxt);
+    if (std::holds_alternative<int>(lv)
+        && std::holds_alternative<int>(rv)) {
+        int ln = std::get<int>(lv);
+        int rn = std::get<int>(rv);
+        return Valu {ln < rn};
+    } else {
+        std::string msg = "Run-time error: wrong operand type for less than.";
+        throw DwislpyError { where(), msg };
+    }      
+}
+
+Valu LtEq::eval(const Defs& defs, const Ctxt& ctxt) const {
+       Valu lv = left->eval(defs,ctxt);
+    Valu rv = rght->eval(defs,ctxt);
+    if (std::holds_alternative<int>(lv)
+        && std::holds_alternative<int>(rv)) {
+        int ln = std::get<int>(lv);
+        int rn = std::get<int>(rv);
+        return Valu {ln <= rn};
+    } else {
+        std::string msg = "Run-time error: wrong operand type for less than or equal to.";
+        throw DwislpyError { where(), msg };
+    }
+}
+
+Valu Eqal::eval(const Defs& defs, const Ctxt& ctxt) const {
+    Valu lv = left->eval(defs,ctxt);
+    Valu rv = rght->eval(defs,ctxt);
+    if (std::holds_alternative<int>(lv)
+        && std::holds_alternative<int>(rv)) {
+        int ln = std::get<int>(lv);
+        int rn = std::get<int>(rv);
+        return Valu {ln == rn};
+    } else if (std::holds_alternative<std::string>(lv)
+               && std::holds_alternative<std::string>(rv)) {
+        std::string ls = std::get<std::string>(lv);
+        std::string rs = std::get<std::string>(rv);
+        bool ret = (ls.compare(rs) == 0);
+        return Valu {ret};
+    } else {
+        return Valu {false};
+    }      
+}
+
+Valu Negt::eval(const Defs& defs, const Ctxt& ctxt) const {
+    Valu ex = expn->eval(defs,ctxt);
+    bool res = predicate(ex);
+    return Valu {!res};  
 }
 
 Valu Mnus::eval(const Defs& defs, const Ctxt& ctxt) const {
@@ -277,6 +451,14 @@ Valu StrC::eval([[maybe_unused]] const Defs& defs, const Ctxt& ctxt) const {
     return Valu { to_string(v) };
 }
 
+//
+// Expn::pred
+//
+/*
+Bool Plus::pred(const Defs& defs, const Ctxt& ctxt) const {
+    return left->pred(defs,ctxt) || rght->pred(defs,ctxt);
+}*/
+
 // * * * * *
 //
 // AST::output
@@ -297,8 +479,14 @@ void Prgm::output(std::ostream& os) const {
 }
 
 void Defn::output(std::ostream& os) const {
-    // Your code goes here.
-    os << "def" << std::endl; // BOGUS to shut up compiler warning.
+    os << "def " << name << "(";
+    for (Name a : prms) {
+        os << a;
+        if (a.compare(prms.back()) != 0) {
+            os << ", ";
+        }
+    }
+    nest->output(os);
 }
 
 void Blck::output(std::ostream& os, std::string indent) const {
@@ -312,6 +500,15 @@ void Blck::output(std::ostream& os) const {
         s->output(os);
     }
 }
+
+void Nest::output(std::ostream& os, std::string indent) const {
+    blck->output(os,indent + "    ");
+}
+
+void Nest::output(std::ostream& os) const {
+    blck->output(os,"    ");
+}
+
 
 void Stmt::output(std::ostream& os) const {
     output(os,"");
@@ -334,6 +531,43 @@ void Prnt::output(std::ostream& os, std::string indent) const {
     os << "(";
     expn->output(os);
     os << ")";
+    os << std::endl;
+}
+
+void PlEq::output(std::ostream& os, std::string indent) const {
+    os << indent;
+    os << name;
+    os << " += ";
+    expn->output(os);
+    os << std::endl;
+}
+
+void MiEq::output(std::ostream& os, std::string indent) const {
+    os << indent;
+    os << name;
+    os << " -= ";
+    expn->output(os);
+    os << std::endl;
+}
+
+void Whle::output(std::ostream& os, std::string indent) const {
+    os << indent;
+    os << "while";
+    os << "(";
+    expn->output(os);
+    os << "):";
+    os << std::endl;
+    nest->output(os, indent);
+}
+
+void Tern::output(std::ostream& os, std::string indent) const {
+    os << indent;
+    os << "if ";
+    expn->output(os);
+    os << ":" << std::endl;
+    nest_if->output(os, indent);
+    os << "else:" << std::endl;
+    nest_else->output(os, indent);
     os << std::endl;
 }
 
@@ -376,6 +610,53 @@ void IMod::output(std::ostream& os) const {
     rght->output(os);
     os << ")";
 }
+
+void Conj::output(std::ostream& os) const {
+    os << "(";
+    left->output(os);
+    os << " and ";
+    rght->output(os);
+    os << ")";
+}
+
+void Disj::output(std::ostream& os) const {
+    os << "(";
+    left->output(os);
+    os << " or ";
+    rght->output(os);
+    os << ")";
+}
+
+void Less::output(std::ostream& os) const {
+    os << "(";
+    left->output(os);
+    os << " < ";
+    rght->output(os);
+    os << ")";
+}
+
+void LtEq::output(std::ostream& os) const {
+    os << "(";
+    left->output(os);
+    os << " <= ";
+    rght->output(os);
+    os << ")";
+}
+
+void Eqal::output(std::ostream& os) const {
+    os << "(";
+    left->output(os);
+    os << " == ";
+    rght->output(os);
+    os << ")";
+}
+
+void Negt::output(std::ostream& os) const {
+    os << "not(";
+    expn->output(os);
+    os << ")";
+}
+
 
 void Ltrl::output(std::ostream& os) const {
     os << to_repr(valu);
@@ -433,7 +714,7 @@ void Prgm::dump(int level) const {
 void Defn::dump(int level) const {
     dump_indent(level);
     std::cout << "DEFN" << std::endl;
-    // Your code goes here.
+    nest->dump(level+1);
 }
 
 void Blck::dump(int level) const {
@@ -442,6 +723,12 @@ void Blck::dump(int level) const {
     for (Stmt_ptr stmt : stmts) {
         stmt->dump(level+1);
     }
+}
+
+void Nest::dump(int level) const {
+    dump_indent(level);
+    std::cout << "NEST" << std::endl;
+    blck->dump(level+1);
 }
 
 void Asgn::dump(int level) const {
@@ -456,6 +743,37 @@ void Prnt::dump(int level) const {
     dump_indent(level);
     std::cout << "PRNT" << std::endl;
     expn->dump(level+1);
+}
+
+void PlEq::dump(int level) const {
+    dump_indent(level);
+    std::cout << "PLEQ" << std::endl;
+    dump_indent(level+1);
+    std::cout << name << std::endl;
+    expn->dump(level+1);
+}
+
+void MiEq::dump(int level) const {
+    dump_indent(level);
+    std::cout << "MIEQ" << std::endl;
+    dump_indent(level+1);
+    std::cout << name << std::endl;
+    expn->dump(level+1);
+}
+
+void Whle::dump(int level) const {
+    dump_indent(level);
+    std::cout << "WHLE" << std::endl;
+    expn->dump(level+1);
+    nest->dump(level+1);
+}
+
+void Tern::dump(int level) const {
+    dump_indent(level);
+    std::cout << "TERN" << std::endl;
+    expn->dump(level+1);
+    nest_if->dump(level+1);
+    nest_else->dump(level+1);
 }
 
 void Pass::dump(int level) const {
@@ -496,6 +814,47 @@ void IMod::dump(int level) const {
     std::cout << "IDIV" << std::endl;
     left->dump(level+1);
     rght->dump(level+1);
+}
+
+void Conj::dump(int level) const {
+    dump_indent(level);
+    std::cout << "CONJ" << std::endl;
+    left->dump(level+1);
+    rght->dump(level+1);
+}
+
+void Disj::dump(int level) const {
+    dump_indent(level);
+    std::cout << "PLUS" << std::endl;
+    left->dump(level+1);
+    rght->dump(level+1);
+}
+
+void Less::dump(int level) const {
+    dump_indent(level);
+    std::cout << "LESS" << std::endl;
+    left->dump(level+1);
+    rght->dump(level+1);
+}
+
+void LtEq::dump(int level) const {
+    dump_indent(level);
+    std::cout << "LTEQ" << std::endl;
+    left->dump(level+1);
+    rght->dump(level+1);
+}
+
+void Eqal::dump(int level) const {
+    dump_indent(level);
+    std::cout << "EQAL" << std::endl;
+    left->dump(level+1);
+    rght->dump(level+1);
+}
+
+void Negt::dump(int level) const {
+    dump_indent(level);
+    std::cout << "Negt" << std::endl;
+    expn->dump(level+1);
 }
 
 void Ltrl::dump(int level) const {

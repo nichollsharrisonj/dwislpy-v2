@@ -356,6 +356,26 @@ WSPC    {INDT}
 <MID_LINE>"=" {
     return issue(token::Token_ASGN,yytext,loc);
 }
+
+<MID_LINE>"<" {
+    return issue(token::Token_LESS,yytext,loc);
+}
+
+<MID_LINE>"<=" {
+    return issue(token::Token_LTEQ,yytext,loc);
+}
+
+<MID_LINE>"and" {
+    return issue(token::Token_CONJ,yytext,loc);
+}
+
+<MID_LINE>"or" {
+    return issue(token::Token_DISJ,yytext,loc);
+}
+
+<MID_LINE>":" {
+    return issue(token::Token_COLN,yytext,loc);
+}
     
 <MID_LINE>"(" {
     return issue(token::Token_LPAR,yytext,loc);
@@ -364,13 +384,29 @@ WSPC    {INDT}
 <MID_LINE>")" {
     return issue(token::Token_RPAR,yytext,loc);
 }
-     
+
+<MID_LINE>"+=" {
+    return issue(token::Token_PLEQ,yytext,loc);
+}
+
+<MID_LINE>"-=" {
+    return issue(token::Token_MIEQ,yytext,loc);
+}
+
 <MID_LINE>"+" {
     return issue(token::Token_PLUS,yytext,loc);
 }
 
 <MID_LINE>"-" {
     return issue(token::Token_MNUS,yytext,loc);
+}
+
+<MID_LINE>"==" {
+    return issue(token::Token_EQAL,yytext,loc);
+}
+
+<MID_LINE>"not" {
+    return issue(token::Token_NEGT,yytext,loc);
 }
  
 <MID_LINE>"*" {
@@ -387,6 +423,18 @@ WSPC    {INDT}
     
 <MID_LINE>print {
     return issue(token::Token_PRNT,yytext,loc);
+}
+
+<MID_LINE>while {
+    return issue(token::Token_WHLE,yytext,loc);
+}
+
+<MID_LINE>if {
+    return issue(token::Token_IFTN,yytext,loc);
+}
+
+<MID_LINE>else {
+    return issue(token::Token_ELSE,yytext,loc);
 }
     
 <MID_LINE>pass {

@@ -44,12 +44,18 @@
 %token               EOLN
 %token               INDT
 %token               DEDT
+%token               COLN ":"
 %token               PASS "pass"
+%token               WHLE "while"
+%token               IFTN "if"
+%token               ELSE "else"
 %token               PRNT "print"
 %token               INPT "input"
 %token               INTC "int"
 %token               STRC "str"
 %token               ASGN "="
+%token               PLEQ "+="
+%token               MIEQ "-="
 %token               PLUS "+"
 %token               MNUS "-"
 %token               TMES "*"
@@ -57,6 +63,12 @@
 %token               IMOD "%"
 %token               LPAR "(" 
 %token               RPAR ")"
+%token               LESS "<"
+%token               LTEQ "<="
+%token               CONJ "and"
+%token               DISJ "or"
+%token               EQAL "=="
+%token               NEGT "not"
 %token               NONE "None"
 %token               TRUE "True"
 %token               FALS "False"
@@ -65,6 +77,7 @@
 %token <std::string> STRG
 
 %type <Prgm_ptr> prgm
+%type <Nest_ptr> nest
 %type <Blck_ptr> blck
 %type <Stmt_vec> stms
 %type <Stmt_ptr> stmt
@@ -91,6 +104,13 @@ prgm:
   }   
 ;
 
+nest:
+  INDT blck DEDT {
+      Blck_ptr b = $2;
+      $$ = Nest_ptr { new Nest {b, b->where()} };
+  }
+;
+
 blck:
   stms {
       Stmt_vec ss = $1;
@@ -115,11 +135,23 @@ stmt:
   NAME ASGN expn EOLN {
       $$ = Asgn_ptr { new Asgn {$1,$3,lexer.locate(@2)} };
   }
+| NAME PLEQ expn EOLN {
+      $$ = PlEq_ptr { new PlEq {$1,$3,lexer.locate(@2)} };
+  }
+| NAME MIEQ expn EOLN {
+      $$ = MiEq_ptr { new MiEq {$1,$3,lexer.locate(@2)} };
+  }
 | PASS EOLN {
       $$ = Pass_ptr { new Pass {lexer.locate(@1)} };
   }
 | PRNT LPAR expn RPAR EOLN {
       $$ = Prnt_ptr { new Prnt {$3,lexer.locate(@1)} };
+  }
+| WHLE expn COLN EOLN nest {
+      $$ = Whle_ptr { new Whle {$2,$5,lexer.locate(@2)} };
+  }
+| IFTN expn COLN EOLN nest ELSE COLN EOLN nest {
+      $$ = Tern_ptr { new Tern {$2,$5,$9,lexer.locate(@2)} };
   }
 ;
 
@@ -138,6 +170,24 @@ expn:
   }
 | expn IMOD expn {
       $$ = IMod_ptr { new IMod {$1,$3,lexer.locate(@2)} };
+  }
+| expn CONJ expn {
+      $$ = Conj_ptr { new Conj {$1,$3,lexer.locate(@2)} };
+  }
+| expn DISJ expn {
+      $$ = Disj_ptr { new Disj {$1,$3,lexer.locate(@2)} };
+  }
+| expn LESS expn {
+      $$ = Less_ptr { new Less {$1,$3,lexer.locate(@2)} };
+  }
+| expn LTEQ expn {
+      $$ = LtEq_ptr { new LtEq {$1,$3,lexer.locate(@2)} };
+  }
+| expn EQAL expn {
+      $$ = Eqal_ptr { new Eqal {$1,$3,lexer.locate(@2)} };
+  }
+| NEGT expn {
+      $$ = Negt_ptr { new Negt {$2,lexer.locate(@1)} };
   }
 | NMBR {
       $$ = Ltrl_ptr { new Ltrl {Valu {$1},lexer.locate(@1)} };

@@ -45,15 +45,28 @@ typedef std::variant<int, bool, std::string, none> Valu;
 //
 
 class Prgm;
-class Defn;
+class Defn; // needs defining
+class Nest; // ? 
 class Blck;
 //
 class Stmt;
 class Pass;
 class Asgn;
 class Prnt;
+class Whle; //
+class Tern; //
+//
+class Updt; //
+class PlEq; //
+class MiEq; //
 //
 class Expn;
+class Conj; //
+class Disj; //
+class Less; //
+class LtEq; // 
+class Eqal; //
+class Negt; //
 class Plus;
 class Mnus;
 class Tmes;
@@ -85,13 +98,26 @@ typedef std::shared_ptr<Mnus> Mnus_ptr;
 typedef std::shared_ptr<Tmes> Tmes_ptr;
 typedef std::shared_ptr<IDiv> IDiv_ptr;
 typedef std::shared_ptr<IMod> IMod_ptr;
+typedef std::shared_ptr<Conj> Conj_ptr;
+typedef std::shared_ptr<Disj> Disj_ptr;
+typedef std::shared_ptr<Less> Less_ptr;
+typedef std::shared_ptr<LtEq> LtEq_ptr;
+typedef std::shared_ptr<Eqal> Eqal_ptr;
+typedef std::shared_ptr<Negt> Negt_ptr;
+
+
 //
+typedef std::shared_ptr<Whle> Whle_ptr; 
+typedef std::shared_ptr<Tern> Tern_ptr; 
 typedef std::shared_ptr<Pass> Pass_ptr; 
 typedef std::shared_ptr<Prnt> Prnt_ptr; 
 typedef std::shared_ptr<Asgn> Asgn_ptr;
+typedef std::shared_ptr<PlEq> PlEq_ptr; // +=
+typedef std::shared_ptr<MiEq> MiEq_ptr; // -=
 //
 typedef std::shared_ptr<Prgm> Prgm_ptr; 
 typedef std::shared_ptr<Defn> Defn_ptr; 
+typedef std::shared_ptr<Nest> Nest_ptr; 
 typedef std::shared_ptr<Blck> Blck_ptr; 
 typedef std::shared_ptr<Stmt> Stmt_ptr; 
 typedef std::shared_ptr<Expn> Expn_ptr;
@@ -162,6 +188,22 @@ public:
 };
 
 //
+// class Nest
+//
+// Representes an indented Blck
+//
+class Nest : public AST {
+public:
+    Blck_ptr blck;
+    virtual ~Nest(void) = default;
+    Nest(Blck_ptr b, Locn lo) : AST {lo}, blck {b}  { }
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual void output(std::ostream& os, std::string indent) const;
+    virtual void output(std::ostream& os) const;
+    virtual void dump(int level = 0) const;
+};
+
+//
 // class Defn
 //
 // This should become the AST node type that results from parsing
@@ -170,9 +212,14 @@ public:
 class Defn : public AST {
 public:
     //
-    Defn(Locn lo) : AST {lo} { }
+    Name name;
+    Name_vec prms;
+    Nest_ptr nest; // ? do we need to have a nest class and ptr
+    //
+    Defn(Name x, Name_vec y, Nest_ptr z, Locn lo) : AST {lo}, name {x}, prms {y}, nest {z} { } 
     virtual ~Defn(void) = default;
     //
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const = 0;
     virtual void dump(int level = 0) const;
     virtual void output(std::ostream& os) const; // Output formatted code.
 };
@@ -235,6 +282,41 @@ public:
     virtual void dump(int level = 0) const;
 };
 
+//
+// Whle - loop statement AST node
+//
+class Whle : public Stmt {
+public:
+    //
+    Expn_ptr expn;
+    Nest_ptr nest; 
+    //
+    Whle(Expn_ptr e, Nest_ptr n, Locn l) : Stmt {l}, expn {e}, nest {n} { }
+    virtual ~Whle(void) = default; // default destructor i guess
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const; // ?
+    virtual void output(std::ostream& os, std::string indent) const; // ?
+    virtual void dump(int level = 0) const; // ?
+
+};
+
+//
+// Tern - loop statement AST node
+//
+class Tern : public Stmt {
+public:
+    //
+    Expn_ptr expn;
+    Nest_ptr nest_if;
+    Nest_ptr nest_else; 
+    //
+    Tern(Expn_ptr e, Nest_ptr ni, Nest_ptr ne, Locn l) : Stmt {l}, expn {e}, nest_if {ni}, nest_else {ne} { }
+    virtual ~Tern(void) = default; // default destructor i guess
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const; // ?
+    virtual void output(std::ostream& os, std::string indent) const; // ?
+    virtual void dump(int level = 0) const; // ?
+
+};
+
 
 //
 // Pass - pass statement AST node
@@ -243,6 +325,35 @@ class Pass : public Stmt {
 public:
     Pass(Locn l) : Stmt {l} { }
     virtual ~Pass(void) = default;
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual void output(std::ostream& os, std::string indent) const;
+    virtual void dump(int level = 0) const;
+};
+
+
+//
+// PlEq - += statement AST node
+//
+class PlEq : public Stmt {
+public:
+    Name name;
+    Expn_ptr expn;
+    PlEq(Name n, Expn_ptr e, Locn lo) : Stmt {lo}, name {n}, expn {e} { }
+    virtual ~PlEq(void) = default;
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual void output(std::ostream& os, std::string indent) const;
+    virtual void dump(int level = 0) const;
+};
+
+//
+// MiEq - -= statement AST node
+//
+class MiEq : public Stmt {
+public:
+    Name name;
+    Expn_ptr expn;
+    MiEq(Name n, Expn_ptr e, Locn lo) : Stmt {lo}, name {n}, expn {e} { }
+    virtual ~MiEq(void) = default;
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
@@ -263,6 +374,8 @@ public:
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
+
+
 
 
 //
@@ -292,6 +405,7 @@ public:
     Expn(Locn lo) : AST {lo} { }
     virtual ~Expn(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const = 0;
+    //virtual Bool pred(const Defs& defs, const Ctxt& ctxt) const = 0;
 };
 
 //
@@ -304,6 +418,79 @@ public:
     Plus(Expn_ptr lf, Expn_ptr rg, Locn lo)
         : Expn {lo}, left {lf}, rght {rg} { }
     virtual ~Plus(void) = default;
+    virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual void output(std::ostream& os) const;
+    virtual void dump(int level = 0) const;
+};
+
+//
+// Conj - logical and operation's AST node
+//
+class Conj : public Expn {
+public:
+    Expn_ptr left;
+    Expn_ptr rght;
+    Conj(Expn_ptr lf, Expn_ptr rg, Locn lo)
+        : Expn {lo}, left {lf}, rght {rg} { }
+    virtual ~Conj(void) = default;
+    virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual void output(std::ostream& os) const;
+    virtual void dump(int level = 0) const;
+};
+
+class Disj : public Expn {
+public:
+    Expn_ptr left;
+    Expn_ptr rght;
+    Disj(Expn_ptr lf, Expn_ptr rg, Locn lo)
+        : Expn {lo}, left {lf}, rght {rg} { }
+    virtual ~Disj(void) = default;
+    virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual void output(std::ostream& os) const;
+    virtual void dump(int level = 0) const;
+};
+
+class Less : public Expn {
+public:
+    Expn_ptr left;
+    Expn_ptr rght;
+    Less(Expn_ptr lf, Expn_ptr rg, Locn lo)
+        : Expn {lo}, left {lf}, rght {rg} { }
+    virtual ~Less(void) = default;
+    virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual void output(std::ostream& os) const;
+    virtual void dump(int level = 0) const;
+};
+
+class LtEq : public Expn {
+public:
+    Expn_ptr left;
+    Expn_ptr rght;
+    LtEq(Expn_ptr lf, Expn_ptr rg, Locn lo)
+        : Expn {lo}, left {lf}, rght {rg} { }
+    virtual ~LtEq(void) = default;
+    virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual void output(std::ostream& os) const;
+    virtual void dump(int level = 0) const;
+};
+
+class Eqal : public Expn {
+public:
+    Expn_ptr left;
+    Expn_ptr rght;
+    Eqal(Expn_ptr lf, Expn_ptr rg, Locn lo)
+        : Expn {lo}, left {lf}, rght {rg} { }
+    virtual ~Eqal(void) = default;
+    virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual void output(std::ostream& os) const;
+    virtual void dump(int level = 0) const;
+};
+
+class Negt : public Expn {
+public:
+    Expn_ptr expn;
+    Negt(Expn_ptr e, Locn lo) : Expn {lo}, expn {e} { }
+    virtual ~Negt(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
@@ -378,6 +565,7 @@ public:
     Ltrl(Valu vl, Locn lo) : Expn {lo}, valu {vl} { }
     virtual ~Ltrl(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    // ? add eval to bool
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };

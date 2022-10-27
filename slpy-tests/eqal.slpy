@@ -1,0 +1,11 @@
+a = 3
+First = a
+Second = 3
+print("3 == 3:")
+print(First == Second)
+
+print("Hello == Goodbye:")
+print("Hello" == "Goodbye")
+
+print("Hello == Hello:")
+print("Hello" == "Hello")
