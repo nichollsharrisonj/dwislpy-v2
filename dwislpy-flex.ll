@@ -426,6 +426,10 @@ WSPC    {INDT}
     return issue(token::Token_COMA,yytext,loc);
 }
 
+<MID_LINE>return {
+    return issue(token::Token_RETN,yytext,loc);
+}
+
 <MID_LINE>def {
     return issue(token::Token_DEFN,yytext,loc);
 }

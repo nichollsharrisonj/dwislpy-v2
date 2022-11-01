@@ -49,6 +49,7 @@
 %token               DEFN "def"
 %token               PASS "pass"
 %token               WHLE "while"
+%token               RETN "return"
 %token               IFTN "if"
 %token               ELSE "else"
 %token               PRNT "print"
@@ -79,6 +80,10 @@
 %token <std::string> STRG
 
 %type <Prgm_ptr> prgm
+%type <Expn_vec> prms
+%type <Name_vec> nams
+%type <Defs> defs
+%type <Defn_ptr> defn
 %type <Nest_ptr> nest
 %type <Blck_ptr> blck
 %type <Stmt_vec> stms
@@ -99,11 +104,44 @@ main:
 ;
 
 prgm:
-  blck {
+  defs blck {
+      Defs ds = $1;
+      Blck_ptr b = $2; 
+      $$ = Prgm_ptr { new Prgm {ds, b, b->where()} };
+  }
+| blck {
       Defs ds { };
       Blck_ptr b = $1; 
       $$ = Prgm_ptr { new Prgm {ds, b, b->where()} };
   }   
+;
+
+defs:
+  defs defn {
+      Defs ds = $1;
+      ds.push_back($2);
+      $$ = ds;
+  }
+| defn {
+      Defs ds { };
+      ds.push_back($1);
+      $$ = ds;
+  }
+;
+
+defn:
+  DEFN NAME LPAR nams RPAR COLN EOLN nest {
+      Name f = $2;
+      Name_vec p = $4;
+      Nest_ptr n = $8;
+      $$ = Defn_ptr { new Defn {f, p, n, n->where()} };
+  }
+| DEFN NAME LPAR RPAR COLN EOLN nest {
+      Name f = $2;
+      Name_vec p = { };
+      Nest_ptr n = $7;
+      $$ = Defn_ptr { new Defn {f, p, n, n->where()} };
+  }
 ;
 
 nest:
@@ -117,6 +155,32 @@ blck:
   stms {
       Stmt_vec ss = $1;
       $$ = Blck_ptr { new Blck {ss, ss[0]->where()} };
+  }
+;
+
+prms: 
+  prms COMA expn  {
+      Expn_vec ps = $1;
+      ps.push_back($3);
+      $$ = ps;
+  }
+| expn {
+      Expn_vec ps { };
+      ps.push_back($1);
+      $$ = ps;
+  }
+;
+
+nams: 
+  nams COMA NAME  {
+      Name_vec as = $1;
+      as.push_back($3);
+      $$ = as;
+  }
+| NAME {
+      Name_vec as { };
+      as.push_back($1);
+      $$ = as;
   }
 ;
 
@@ -143,11 +207,22 @@ stmt:
 | NAME MIEQ expn EOLN {
       $$ = MiEq_ptr { new MiEq {$1,$3,lexer.locate(@2)} };
   }
+| NAME LPAR prms RPAR EOLN {
+      $$ = SCal_ptr { new SCal {$1,$3,lexer.locate(@2)} };
+  }
+| NAME LPAR RPAR EOLN {
+      Expn_vec a = { };
+      $$ = SCal_ptr { new SCal {$1,a,lexer.locate(@2)} };
+  }
 | PASS EOLN {
       $$ = Pass_ptr { new Pass {lexer.locate(@1)} };
   }
-| PRNT LPAR expn RPAR EOLN {
+| PRNT LPAR prms RPAR EOLN {
       $$ = Prnt_ptr { new Prnt {$3,lexer.locate(@1)} };
+  }
+| PRNT LPAR RPAR EOLN {
+      Expn_vec p = { };
+      $$ = Prnt_ptr { new Prnt {p,lexer.locate(@1)} };
   }
 | WHLE expn COLN EOLN nest {
       $$ = Whle_ptr { new Whle {$2,$5,lexer.locate(@2)} };
@@ -155,10 +230,23 @@ stmt:
 | IFTN expn COLN EOLN nest ELSE COLN EOLN nest {
       $$ = Tern_ptr { new Tern {$2,$5,$9,lexer.locate(@2)} };
   }
+| RETN expn EOLN {
+      $$ = RetE_ptr { new RetE {$2,lexer.locate(@2)} };
+  }
+| RETN EOLN {
+      $$ = Retn_ptr { new Retn {lexer.locate(@2)} };
+  }
 ;
 
 expn:
-  expn PLUS expn {
+  NAME LPAR prms RPAR {
+      $$ = ECal_ptr { new ECal {$1,$3,lexer.locate(@2)} };
+  }
+| NAME LPAR RPAR {
+      Expn_vec a = { };
+      $$ = ECal_ptr { new ECal {$1,a,lexer.locate(@2)} };
+  }
+|  expn PLUS expn {
       $$ = Plus_ptr { new Plus {$1,$3,lexer.locate(@2)} };
   }
 | expn MNUS expn {

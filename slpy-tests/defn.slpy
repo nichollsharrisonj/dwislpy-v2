@@ -1,0 +1,13 @@
+def add(x, y):
+    return x + y
+
+def p(x):
+    print(x)
+
+def r(x):
+    return x
+
+y = 0
+
+print("  0", "+ 1", "---")
+p(r(add(y,1)))

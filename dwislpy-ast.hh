@@ -45,7 +45,7 @@ typedef std::variant<int, bool, std::string, none> Valu;
 //
 
 class Prgm;
-class Defn; // needs defining
+class Defn; // def
 class Nest; // ? 
 class Blck;
 //
@@ -55,10 +55,13 @@ class Asgn;
 class Prnt;
 class Whle; //
 class Tern; //
-//
 class Updt; //
 class PlEq; //
 class MiEq; //
+class Retn; // return EOLN
+class RetE; // return expn
+class SCal; // f(...) (For calls in statement form)
+class ECal; // 
 //
 class Expn;
 class Conj; //
@@ -107,13 +110,18 @@ typedef std::shared_ptr<Negt> Negt_ptr;
 
 
 //
-typedef std::shared_ptr<Whle> Whle_ptr; 
-typedef std::shared_ptr<Tern> Tern_ptr; 
+typedef std::shared_ptr<Whle> Whle_ptr; // while ( ) :
+typedef std::shared_ptr<Tern> Tern_ptr; // if : else : 
+typedef std::shared_ptr<SCal> SCal_ptr; // f (...) 
+typedef std::shared_ptr<ECal> ECal_ptr; // f (...) 
 typedef std::shared_ptr<Pass> Pass_ptr; 
 typedef std::shared_ptr<Prnt> Prnt_ptr; 
 typedef std::shared_ptr<Asgn> Asgn_ptr;
 typedef std::shared_ptr<PlEq> PlEq_ptr; // +=
 typedef std::shared_ptr<MiEq> MiEq_ptr; // -=
+typedef std::shared_ptr<MiEq> MiEq_ptr; // -=
+typedef std::shared_ptr<Retn> Retn_ptr; // return EOLN
+typedef std::shared_ptr<RetE> RetE_ptr; // return expn
 //
 typedef std::shared_ptr<Prgm> Prgm_ptr; 
 typedef std::shared_ptr<Defn> Defn_ptr; 
@@ -123,8 +131,8 @@ typedef std::shared_ptr<Stmt> Stmt_ptr;
 typedef std::shared_ptr<Expn> Expn_ptr;
 //
 typedef std::vector<Stmt_ptr> Stmt_vec;
-typedef std::vector<Expn_ptr> Expn_vec;
-typedef std::vector<Name> Name_vec;
+typedef std::vector<Expn_ptr> Expn_vec; // params
+typedef std::vector<Name> Name_vec; // param names
 typedef std::vector<Defn_ptr> Defs;
 //
     
@@ -213,13 +221,13 @@ class Defn : public AST {
 public:
     //
     Name name;
-    Name_vec prms;
+    Name_vec args;
     Nest_ptr nest; // ? do we need to have a nest class and ptr
     //
-    Defn(Name x, Name_vec y, Nest_ptr z, Locn lo) : AST {lo}, name {x}, prms {y}, nest {z} { } 
+    Defn(Name x, Name_vec y, Nest_ptr z, Locn lo) : AST {lo}, name {x}, args {y}, nest {z} { } 
     virtual ~Defn(void) = default;
     //
-    // virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const = 0;
+    //virtual Valu call(const Defs& defs, Ctxt& ctxt);
     virtual void dump(int level = 0) const;
     virtual void output(std::ostream& os) const; // Output formatted code.
 };
@@ -256,6 +264,20 @@ public:
 };
 
 //
+// Call - function call statement AST node
+//
+class SCal : public Stmt {
+public:
+    Name name;
+    Expn_vec args;
+    SCal(Name x, Expn_vec a, Locn l) : Stmt {l}, name {x}, args {a} { }
+    virtual ~SCal(void) = default;
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual void output(std::ostream& os, std::string indent) const;
+    virtual void dump(int level = 0) const;
+};
+
+//
 // Asgn - assignment statement AST node
 //
 class Asgn : public Stmt {
@@ -274,8 +296,8 @@ public:
 //
 class Prnt : public Stmt {
 public:
-    Expn_ptr expn;
-    Prnt(Expn_ptr e, Locn l) : Stmt {l}, expn {e} { }
+    Expn_vec prms;
+    Prnt(Expn_vec a, Locn l) : Stmt {l}, prms {a} { }
     virtual ~Prnt(void) = default;
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
     virtual void output(std::ostream& os, std::string indent) const;
@@ -293,9 +315,9 @@ public:
     //
     Whle(Expn_ptr e, Nest_ptr n, Locn l) : Stmt {l}, expn {e}, nest {n} { }
     virtual ~Whle(void) = default; // default destructor i guess
-    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const; // ?
-    virtual void output(std::ostream& os, std::string indent) const; // ?
-    virtual void dump(int level = 0) const; // ?
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual void output(std::ostream& os, std::string indent) const; 
+    virtual void dump(int level = 0) const;
 
 };
 
@@ -311,9 +333,9 @@ public:
     //
     Tern(Expn_ptr e, Nest_ptr ni, Nest_ptr ne, Locn l) : Stmt {l}, expn {e}, nest_if {ni}, nest_else {ne} { }
     virtual ~Tern(void) = default; // default destructor i guess
-    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const; // ?
-    virtual void output(std::ostream& os, std::string indent) const; // ?
-    virtual void dump(int level = 0) const; // ?
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual void output(std::ostream& os, std::string indent) const;
+    virtual void dump(int level = 0) const;
 
 };
 
@@ -354,6 +376,31 @@ public:
     Expn_ptr expn;
     MiEq(Name n, Expn_ptr e, Locn lo) : Stmt {lo}, name {n}, expn {e} { }
     virtual ~MiEq(void) = default;
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual void output(std::ostream& os, std::string indent) const;
+    virtual void dump(int level = 0) const;
+};
+
+//
+// Retn - return EOLN
+//
+class Retn : public Stmt {
+public:
+    Retn(Locn lo) : Stmt {lo} { }
+    virtual ~Retn(void) = default;
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual void output(std::ostream& os, std::string indent) const;
+    virtual void dump(int level = 0) const;
+};
+
+//
+// RetE - return <expn>
+//
+class RetE : public Stmt {
+public:
+    Expn_ptr expn;
+    RetE(Expn_ptr e, Locn lo) : Stmt {lo}, expn {e} { }
+    virtual ~RetE(void) = default;
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
@@ -406,6 +453,20 @@ public:
     virtual ~Expn(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const = 0;
     //virtual Bool pred(const Defs& defs, const Ctxt& ctxt) const = 0;
+};
+
+//
+// ECal - expression call for a function
+//
+class ECal : public Expn {
+public:
+    Name name;
+    Expn_vec args;
+    ECal(Name x, Expn_vec a, Locn l) : Expn {l}, name {x}, args {a} { }
+    virtual ~ECal(void) = default;
+    virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual void output(std::ostream& os) const;
+    virtual void dump(int level = 0) const;
 };
 
 //

@@ -194,8 +194,48 @@ std::optional<Valu> Pass::exec([[maybe_unused]] const Defs& defs,
 }
   
 std::optional<Valu> Prnt::exec(const Defs& defs, Ctxt& ctxt) const {
-    std::cout << to_string(expn->eval(defs,ctxt)) << std::endl;
+    if (prms.empty()) {
+        std::cout << std::endl;
+        return std::nullopt;
+    }
+
+    for (Expn_ptr expn : prms) {
+        std::cout << to_string(expn->eval(defs,ctxt)) << std::endl;
+    }
     return std::nullopt;
+}
+
+/*
+Valu Defn::call(const Defs& defs, Ctxt& ctxt) const {
+
+}*/
+
+
+std::optional<Valu> SCal::exec(const Defs& defs, Ctxt& ctxt) const {
+
+    for (int i = (int)defs.size()-1; i >= 0; --i) {
+        Defn_ptr def = defs[i];
+        if (def->name.compare(name) == 0) {
+            if (def->args.size() != args.size()) {
+                std::string msg = "Incorrect number of args found for function " 
+                    + name + ": expected " + std::to_string(def->args.size()) + ", saw " 
+                    + std::to_string(args.size()) + ".";
+                throw DwislpyError { where(), msg };
+            }
+
+            Ctxt fctxt = { };
+            for (int i = 0; i < (int)args.size(); ++i) fctxt[def->args[i]] = args[i]->eval(defs,ctxt);
+            std::optional<Valu> rv = def->nest->exec(defs,fctxt);
+            if (rv.has_value()) {
+                return rv;
+            } 
+            return std::nullopt;
+        }
+    }
+
+
+    std::string msg = "No function with name " + name + " found.";
+    throw DwislpyError { where(), msg };
 }
 
 std::optional<Valu> Whle::exec(const Defs& defs, Ctxt& ctxt) const {
@@ -223,12 +263,47 @@ std::optional<Valu> Tern::exec(const Defs& defs, Ctxt& ctxt) const {
     return std::nullopt;
 }
 
+std::optional<Valu> Retn::exec(const Defs& defs, Ctxt& ctxt) const {
+    return Valu { };
+}
+
+std::optional<Valu> RetE::exec(const Defs& defs, Ctxt& ctxt) const {
+    Valu e = expn->eval(defs,ctxt);
+    return e;
+}
+
 //
 // Expn::eval
 //
 //  - evaluate DWISLPY expressions within a runtime context to determine their
 //    (integer) value.
 //
+
+Valu ECal::eval(const Defs& defs, const Ctxt& ctxt) const {
+
+    for (int i = (int)defs.size()-1; i >= 0; --i) {
+        Defn_ptr def = defs[i];
+        if (def->name.compare(name) == 0) {
+            if (def->args.size() != args.size()) {
+                std::string msg = "Incorrect number of args found for function " 
+                    + name + ": expected " + std::to_string(def->args.size()) + ", saw " 
+                    + std::to_string(args.size()) + ".";
+                throw DwislpyError { where(), msg };
+            }
+
+            Ctxt fctxt = { };
+            for (int i = 0; i < (int)args.size(); ++i) fctxt[def->args[i]] = args[i]->eval(defs,ctxt);
+            std::optional<Valu> rv = def->nest->exec(defs,fctxt);
+            if (rv.has_value()) {
+                return rv.value();
+            } 
+            return Valu { };
+        }
+    }
+
+    std::string msg = "No function with name " + name + " found.";
+    throw DwislpyError { where(), msg };
+}
 
 Valu Plus::eval(const Defs& defs, const Ctxt& ctxt) const {
     Valu lv = left->eval(defs,ctxt);
@@ -475,12 +550,13 @@ void Prgm::output(std::ostream& os) const {
 
 void Defn::output(std::ostream& os) const {
     os << "def " << name << "(";
-    for (Name a : prms) {
+    for (Name a : args) {
         os << a;
-        if (a.compare(prms.back()) != 0) {
+        if (a.compare(args.back()) != 0) {
             os << ", ";
         }
     }
+    os << "):" << std::endl;
     nest->output(os);
 }
 
@@ -524,7 +600,12 @@ void Prnt::output(std::ostream& os, std::string indent) const {
     os << indent;
     os << "print";
     os << "(";
-    expn->output(os);
+    for (Expn_ptr a : prms) {
+        a->output(os);
+        if (a != prms.back()) {
+            os << ", ";
+        }
+    }
     os << ")";
     os << std::endl;
 }
@@ -555,6 +636,32 @@ void Whle::output(std::ostream& os, std::string indent) const {
     nest->output(os, indent);
 }
 
+void ECal::output(std::ostream& os) const {
+    os << name;
+    os << "(";
+    for (Expn_ptr a : args) {
+        a->output(os);
+        if (a != args.back()) {
+            os << ", ";
+        }
+    }
+    os << ")";
+}
+
+void SCal::output(std::ostream& os, std::string indent) const {
+    os << indent;
+    os << name;
+    os << "(";
+    for (Expn_ptr a : args) {
+        a->output(os);
+        if (a != args.back()) {
+            os << ", ";
+        }
+    }
+    os << ")";
+    os << std::endl;
+}
+
 void Tern::output(std::ostream& os, std::string indent) const {
     os << indent;
     os << "if ";
@@ -563,6 +670,18 @@ void Tern::output(std::ostream& os, std::string indent) const {
     nest_if->output(os, indent);
     os << "else:" << std::endl;
     nest_else->output(os, indent);
+    os << std::endl;
+}
+
+void Retn::output(std::ostream& os, std::string indent) const {
+    os << indent;
+    os << "return" << std::endl;
+}
+
+void RetE::output(std::ostream& os, std::string indent) const {
+    os << indent;
+    os << "return ";
+    expn->output(os);
     os << std::endl;
 }
 
@@ -709,6 +828,10 @@ void Prgm::dump(int level) const {
 void Defn::dump(int level) const {
     dump_indent(level);
     std::cout << "DEFN" << std::endl;
+    for (Name n : args) {
+        dump_indent(level+1);
+        std::cout << n << std::endl;
+    }
     nest->dump(level+1);
 }
 
@@ -737,7 +860,9 @@ void Asgn::dump(int level) const {
 void Prnt::dump(int level) const {
     dump_indent(level);
     std::cout << "PRNT" << std::endl;
-    expn->dump(level+1);
+    for (Expn_ptr expn : prms) {
+        expn->dump(level+1);
+    }
 }
 
 void PlEq::dump(int level) const {
@@ -769,6 +894,37 @@ void Tern::dump(int level) const {
     expn->dump(level+1);
     nest_if->dump(level+1);
     nest_else->dump(level+1);
+}
+
+void ECal::dump(int level) const {
+    dump_indent(level);
+    std::cout << "CALL" << std::endl;
+    dump_indent(level+1);
+    std::cout << name << std::endl;
+    for (Expn_ptr expn : args) {
+        expn->dump(level+1);
+    }
+}
+
+void SCal::dump(int level) const {
+    dump_indent(level);
+    std::cout << "CALL" << std::endl;
+    dump_indent(level+1);
+    std::cout << name << std::endl;
+    for (Expn_ptr expn : args) {
+        expn->dump(level+1);
+    }
+}
+
+void Retn::dump(int level) const {
+    dump_indent(level);
+    std::cout << "RETURN" << std::endl;
+}
+
+void RetE::dump(int level) const {
+    dump_indent(level);
+    std::cout << "RETURN" << std::endl;
+    expn->dump(level+1);
 }
 
 void Pass::dump(int level) const {
