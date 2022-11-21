@@ -11,6 +11,7 @@
 
 #include "dwislpy-ast.hh"
 #include "dwislpy-util.hh"
+#include "dwislpy-check.hh"
 
 //
 // predicate function for Valu
@@ -110,14 +111,6 @@ void Prgm::run(void) const {
     main->exec(defs,main_ctxt);
 }
 
-std::optional<Valu> Nest::exec(const Defs& defs, Ctxt& ctxt) const {
-    std::optional<Valu> rv = blck->exec(defs,ctxt);
-    if (rv.has_value()) {
-        return rv;
-    } 
-    return std::nullopt;
-}
-
 std::optional<Valu> Blck::exec(const Defs& defs, Ctxt& ctxt) const {
     for (Stmt_ptr s : stmts) {
         std::optional<Valu> rv = s->exec(defs,ctxt);
@@ -211,7 +204,7 @@ Valu Defn::call(const Defs& defs, Ctxt& ctxt) const {
 }*/
 
 
-std::optional<Valu> SCal::exec(const Defs& defs, Ctxt& ctxt) const {
+std::optional<Valu> Proc::exec(const Defs& defs, Ctxt& ctxt) const {
 
     for (int i = (int)defs.size()-1; i >= 0; --i) {
         Defn_ptr def = defs[i];
@@ -225,7 +218,7 @@ std::optional<Valu> SCal::exec(const Defs& defs, Ctxt& ctxt) const {
 
             Ctxt fctxt = { };
             for (int i = 0; i < (int)args.size(); ++i) fctxt[def->args[i]] = args[i]->eval(defs,ctxt);
-            std::optional<Valu> rv = def->nest->exec(defs,fctxt);
+            std::optional<Valu> rv = def->blck->exec(defs,fctxt);
             if (rv.has_value()) {
                 return rv;
             } 
@@ -240,7 +233,7 @@ std::optional<Valu> SCal::exec(const Defs& defs, Ctxt& ctxt) const {
 
 std::optional<Valu> Whle::exec(const Defs& defs, Ctxt& ctxt) const {
     while (predicate(expn->eval(defs,ctxt))) {
-        std::optional<Valu> rv = nest->exec(defs,ctxt);
+        std::optional<Valu> rv = blck->exec(defs,ctxt);
         if (rv.has_value()) {
             return rv;
         } 
@@ -250,12 +243,12 @@ std::optional<Valu> Whle::exec(const Defs& defs, Ctxt& ctxt) const {
 
 std::optional<Valu> Tern::exec(const Defs& defs, Ctxt& ctxt) const {
     if (predicate(expn->eval(defs,ctxt))) {
-        std::optional<Valu> rv = nest_if->exec(defs,ctxt);
+        std::optional<Valu> rv = if_blck->exec(defs,ctxt);
         if (rv.has_value()) {
             return rv;
         } 
     } else {
-        std::optional<Valu> rv = nest_else->exec(defs,ctxt);
+        std::optional<Valu> rv = else_blck->exec(defs,ctxt);
         if (rv.has_value()) {
             return rv;
         } 
@@ -263,7 +256,7 @@ std::optional<Valu> Tern::exec(const Defs& defs, Ctxt& ctxt) const {
     return std::nullopt;
 }
 
-std::optional<Valu> Retn::exec(const Defs& defs, Ctxt& ctxt) const {
+std::optional<Valu> Retn::exec([[maybe_unused]] const Defs& defs, [[maybe_unused]] Ctxt& ctxt) const {
     return Valu { };
 }
 
@@ -279,7 +272,7 @@ std::optional<Valu> RetE::exec(const Defs& defs, Ctxt& ctxt) const {
 //    (integer) value.
 //
 
-Valu ECal::eval(const Defs& defs, const Ctxt& ctxt) const {
+Valu Func::eval(const Defs& defs, const Ctxt& ctxt) const {
 
     for (int i = (int)defs.size()-1; i >= 0; --i) {
         Defn_ptr def = defs[i];
@@ -293,7 +286,7 @@ Valu ECal::eval(const Defs& defs, const Ctxt& ctxt) const {
 
             Ctxt fctxt = { };
             for (int i = 0; i < (int)args.size(); ++i) fctxt[def->args[i]] = args[i]->eval(defs,ctxt);
-            std::optional<Valu> rv = def->nest->exec(defs,fctxt);
+            std::optional<Valu> rv = def->blck->exec(defs,fctxt);
             if (rv.has_value()) {
                 return rv.value();
             } 
@@ -327,13 +320,13 @@ Valu Plus::eval(const Defs& defs, const Ctxt& ctxt) const {
 Valu Conj::eval(const Defs& defs, const Ctxt& ctxt) const {
     Valu lv = left->eval(defs,ctxt);
     Valu rv = rght->eval(defs,ctxt);
-    return predicate(lv) && predicate(rv);
+    return Valu { predicate(lv) && predicate(rv) };
 }
 
 Valu Disj::eval(const Defs& defs, const Ctxt& ctxt) const {
     Valu lv = left->eval(defs,ctxt);
     Valu rv = rght->eval(defs,ctxt);
-    return predicate(lv) || predicate(rv);
+    return Valu { predicate(lv) || predicate(rv) };
 }
 
 Valu Less::eval(const Defs& defs, const Ctxt& ctxt) const {
@@ -557,7 +550,7 @@ void Defn::output(std::ostream& os) const {
         }
     }
     os << "):" << std::endl;
-    nest->output(os);
+    blck->output(os);
 }
 
 void Blck::output(std::ostream& os, std::string indent) const {
@@ -571,15 +564,6 @@ void Blck::output(std::ostream& os) const {
         s->output(os);
     }
 }
-
-void Nest::output(std::ostream& os, std::string indent) const {
-    blck->output(os,indent + "    ");
-}
-
-void Nest::output(std::ostream& os) const {
-    blck->output(os,"    ");
-}
-
 
 void Stmt::output(std::ostream& os) const {
     output(os,"");
@@ -633,10 +617,10 @@ void Whle::output(std::ostream& os, std::string indent) const {
     expn->output(os);
     os << "):";
     os << std::endl;
-    nest->output(os, indent);
+    blck->output(os, indent);
 }
 
-void ECal::output(std::ostream& os) const {
+void Func::output(std::ostream& os) const {
     os << name;
     os << "(";
     for (Expn_ptr a : args) {
@@ -648,7 +632,7 @@ void ECal::output(std::ostream& os) const {
     os << ")";
 }
 
-void SCal::output(std::ostream& os, std::string indent) const {
+void Proc::output(std::ostream& os, std::string indent) const {
     os << indent;
     os << name;
     os << "(";
@@ -667,9 +651,9 @@ void Tern::output(std::ostream& os, std::string indent) const {
     os << "if ";
     expn->output(os);
     os << ":" << std::endl;
-    nest_if->output(os, indent);
+    if_blck->output(os, indent);
     os << "else:" << std::endl;
-    nest_else->output(os, indent);
+    else_blck->output(os, indent);
     os << std::endl;
 }
 
@@ -832,7 +816,7 @@ void Defn::dump(int level) const {
         dump_indent(level+1);
         std::cout << n << std::endl;
     }
-    nest->dump(level+1);
+    blck->dump(level+1);
 }
 
 void Blck::dump(int level) const {
@@ -841,12 +825,6 @@ void Blck::dump(int level) const {
     for (Stmt_ptr stmt : stmts) {
         stmt->dump(level+1);
     }
-}
-
-void Nest::dump(int level) const {
-    dump_indent(level);
-    std::cout << "NEST" << std::endl;
-    blck->dump(level+1);
 }
 
 void Asgn::dump(int level) const {
@@ -885,18 +863,18 @@ void Whle::dump(int level) const {
     dump_indent(level);
     std::cout << "WHLE" << std::endl;
     expn->dump(level+1);
-    nest->dump(level+1);
+    blck->dump(level+1);
 }
 
 void Tern::dump(int level) const {
     dump_indent(level);
     std::cout << "TERN" << std::endl;
     expn->dump(level+1);
-    nest_if->dump(level+1);
-    nest_else->dump(level+1);
+    if_blck->dump(level+1);
+    else_blck->dump(level+1);
 }
 
-void ECal::dump(int level) const {
+void Func::dump(int level) const {
     dump_indent(level);
     std::cout << "CALL" << std::endl;
     dump_indent(level+1);
@@ -906,7 +884,7 @@ void ECal::dump(int level) const {
     }
 }
 
-void SCal::dump(int level) const {
+void Proc::dump(int level) const {
     dump_indent(level);
     std::cout << "CALL" << std::endl;
     dump_indent(level+1);

@@ -19,7 +19,7 @@ OBJ=$(SRC:.cc=.o)
 
 all:  $(TARGET)
 
-dwislpy: dwislpy-flex.o dwislpy-bison.tab.o dwislpy-main.o dwislpy-ast.o dwislpy-util.o 
+dwislpy: dwislpy-flex.o dwislpy-bison.tab.o dwislpy-main.o dwislpy-ast.o dwislpy-check.o dwislpy-util.o 
 		$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
 
 lexer: dwislpy-flex.cc
@@ -29,7 +29,7 @@ dwislpy-flex.cc: dwislpy-flex.ll dwislpy-flex.hh dwislpy-util.hh parser
 
 parser: dwislpy-bison.tab.cc dwislpy-bison.tab.hh
 
-dwislpy-bison.tab.cc: dwislpy-bison.yy dwislpy-ast.hh dwislpy-util.hh dwislpy-main.hh
+dwislpy-bison.tab.cc: dwislpy-bison.yy dwislpy-ast.hh dwislpy-check.hh dwislpy-util.hh dwislpy-main.hh
 		$(YACC) $(YACCFLAGS) dwislpy-bison.yy
 
 load-display: load-display.o
@@ -38,6 +38,10 @@ load-display: load-display.o
 %.o: %.cc %.hh
 		$(CXX) $(CXXFLAGS) $(OPTFLAGS) -c -o $@ $<
 
+dwislpy-ast.o: dwislpy-check.hh
+
 clean:
 		touch $(YACC_YACC) dwislpy-flex.cc foo.o foo~ $(TARGET)
 		rm -f *~ *.o $(YACC_YACC) dwislpy-flex.cc $(TARGET)
+		touch stack.hh position.hh location.hh
+		rm -f stack.hh position.hh location.hh

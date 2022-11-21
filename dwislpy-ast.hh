@@ -32,6 +32,7 @@
 #include <iostream>
 #include <variant>
 #include "dwislpy-util.hh"
+#include "dwislpy-check.hh"
 
 // Valu
 //
@@ -46,7 +47,6 @@ typedef std::variant<int, bool, std::string, none> Valu;
 
 class Prgm;
 class Defn; // def
-class Nest; // ? 
 class Blck;
 //
 class Stmt;
@@ -60,9 +60,9 @@ class PlEq; //
 class MiEq; //
 class Retn; // return EOLN
 class RetE; // return expn
-class SCal; // f(...) (For calls in statement form)
-class ECal; // 
+class Proc; // f(...) (For calls in statement form)
 //
+class Func; // 
 class Expn;
 class Conj; //
 class Disj; //
@@ -112,8 +112,8 @@ typedef std::shared_ptr<Negt> Negt_ptr;
 //
 typedef std::shared_ptr<Whle> Whle_ptr; // while ( ) :
 typedef std::shared_ptr<Tern> Tern_ptr; // if : else : 
-typedef std::shared_ptr<SCal> SCal_ptr; // f (...) 
-typedef std::shared_ptr<ECal> ECal_ptr; // f (...) 
+typedef std::shared_ptr<Proc> Proc_ptr; // f (...) 
+typedef std::shared_ptr<Func> Func_ptr; // f (...) 
 typedef std::shared_ptr<Pass> Pass_ptr; 
 typedef std::shared_ptr<Prnt> Prnt_ptr; 
 typedef std::shared_ptr<Asgn> Asgn_ptr;
@@ -124,8 +124,7 @@ typedef std::shared_ptr<Retn> Retn_ptr; // return EOLN
 typedef std::shared_ptr<RetE> RetE_ptr; // return expn
 //
 typedef std::shared_ptr<Prgm> Prgm_ptr; 
-typedef std::shared_ptr<Defn> Defn_ptr; 
-typedef std::shared_ptr<Nest> Nest_ptr; 
+typedef std::shared_ptr<Defn> Defn_ptr;
 typedef std::shared_ptr<Blck> Blck_ptr; 
 typedef std::shared_ptr<Stmt> Stmt_ptr; 
 typedef std::shared_ptr<Expn> Expn_ptr;
@@ -185,6 +184,7 @@ public:
     //
     Defs defs;
     Blck_ptr main;
+    SymT main_symt;
     //
     Prgm(Defs ds, Blck_ptr mn, Locn lo) :
         AST {lo}, defs {ds}, main {mn} { }
@@ -192,24 +192,10 @@ public:
     //
     virtual void dump(int level = 0) const;
     virtual void run(void) const; // Execute the program.
+    virtual void chck(void);                     // Verify the code.
     virtual void output(std::ostream& os) const; // Output formatted code.
 };
 
-//
-// class Nest
-//
-// Representes an indented Blck
-//
-class Nest : public AST {
-public:
-    Blck_ptr blck;
-    virtual ~Nest(void) = default;
-    Nest(Blck_ptr b, Locn lo) : AST {lo}, blck {b}  { }
-    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
-    virtual void output(std::ostream& os, std::string indent) const;
-    virtual void output(std::ostream& os) const;
-    virtual void dump(int level = 0) const;
-};
 
 //
 // class Defn
@@ -222,15 +208,34 @@ public:
     //
     Name name;
     Name_vec args;
-    Nest_ptr nest; // ? do we need to have a nest class and ptr
+    Blck_ptr blck;
     //
-    Defn(Name x, Name_vec y, Nest_ptr z, Locn lo) : AST {lo}, name {x}, args {y}, nest {z} { } 
+    Defn(Name x, Name_vec y, Blck_ptr z, Locn lo) : AST {lo}, name {x}, args {y}, blck {z} { } 
     virtual ~Defn(void) = default;
     //
-    //virtual Valu call(const Defs& defs, Ctxt& ctxt);
+    virtual void chck(Defs& defs);
     virtual void dump(int level = 0) const;
     virtual void output(std::ostream& os) const; // Output formatted code.
 };
+
+//
+// class Blck
+//
+// Represents a sequence of statements.
+//
+class Blck : public AST {
+public:
+    Stmt_vec stmts;
+    virtual ~Blck(void) = default;
+    Blck(Stmt_vec ss, Locn lo) : AST {lo}, stmts {ss}  { }
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
+    virtual void output(std::ostream& os, std::string indent) const;
+    virtual void output(std::ostream& os) const;
+    virtual void dump(int level = 0) const;
+};
+
+
 
 //
 // class Stmt
@@ -259,6 +264,7 @@ public:
     Stmt(Locn lo) : AST {lo} { }
     virtual ~Stmt(void) = default;
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const = 0;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt) = 0;
     virtual void output(std::ostream& os, std::string indent) const = 0;
     virtual void output(std::ostream& os) const;
 };
@@ -266,13 +272,14 @@ public:
 //
 // Call - function call statement AST node
 //
-class SCal : public Stmt {
+class Proc : public Stmt {
 public:
     Name name;
     Expn_vec args;
-    SCal(Name x, Expn_vec a, Locn l) : Stmt {l}, name {x}, args {a} { }
-    virtual ~SCal(void) = default;
+    Proc(Name x, Expn_vec a, Locn l) : Stmt {l}, name {x}, args {a} { }
+    virtual ~Proc(void) = default;
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
 };
@@ -287,6 +294,7 @@ public:
     Asgn(Name x, Expn_ptr e, Locn l) : Stmt {l}, name {x}, expn {e} { }
     virtual ~Asgn(void) = default;
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
 };
@@ -300,6 +308,7 @@ public:
     Prnt(Expn_vec a, Locn l) : Stmt {l}, prms {a} { }
     virtual ~Prnt(void) = default;
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
 };
@@ -311,11 +320,12 @@ class Whle : public Stmt {
 public:
     //
     Expn_ptr expn;
-    Nest_ptr nest; 
+    Blck_ptr blck; 
     //
-    Whle(Expn_ptr e, Nest_ptr n, Locn l) : Stmt {l}, expn {e}, nest {n} { }
+    Whle(Expn_ptr e, Blck_ptr n, Locn l) : Stmt {l}, expn {e}, blck {n} { }
     virtual ~Whle(void) = default; // default destructor i guess
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const; 
     virtual void dump(int level = 0) const;
 
@@ -328,12 +338,13 @@ class Tern : public Stmt {
 public:
     //
     Expn_ptr expn;
-    Nest_ptr nest_if;
-    Nest_ptr nest_else; 
+    Blck_ptr if_blck;
+    Blck_ptr else_blck; 
     //
-    Tern(Expn_ptr e, Nest_ptr ni, Nest_ptr ne, Locn l) : Stmt {l}, expn {e}, nest_if {ni}, nest_else {ne} { }
+    Tern(Expn_ptr e, Blck_ptr i, Blck_ptr el, Locn l) : Stmt {l}, expn {e}, if_blck {i}, else_blck {el} { }
     virtual ~Tern(void) = default; // default destructor i guess
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
 
@@ -348,6 +359,7 @@ public:
     Pass(Locn l) : Stmt {l} { }
     virtual ~Pass(void) = default;
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
 };
@@ -363,6 +375,7 @@ public:
     PlEq(Name n, Expn_ptr e, Locn lo) : Stmt {lo}, name {n}, expn {e} { }
     virtual ~PlEq(void) = default;
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
 };
@@ -377,6 +390,7 @@ public:
     MiEq(Name n, Expn_ptr e, Locn lo) : Stmt {lo}, name {n}, expn {e} { }
     virtual ~MiEq(void) = default;
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
 };
@@ -389,6 +403,7 @@ public:
     Retn(Locn lo) : Stmt {lo} { }
     virtual ~Retn(void) = default;
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
 };
@@ -402,26 +417,10 @@ public:
     RetE(Expn_ptr e, Locn lo) : Stmt {lo}, expn {e} { }
     virtual ~RetE(void) = default;
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
 };
-
-//
-// class Blck
-//
-// Represents a sequence of statements.
-//
-class Blck : public AST {
-public:
-    Stmt_vec stmts;
-    virtual ~Blck(void) = default;
-    Blck(Stmt_vec ss, Locn lo) : AST {lo}, stmts {ss}  { }
-    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
-    virtual void output(std::ostream& os, std::string indent) const;
-    virtual void output(std::ostream& os) const;
-    virtual void dump(int level = 0) const;
-};
-
 
 
 
@@ -451,20 +450,21 @@ class Expn : public AST {
 public:
     Expn(Locn lo) : AST {lo} { }
     virtual ~Expn(void) = default;
-    virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const = 0;
-    //virtual Bool pred(const Defs& defs, const Ctxt& ctxt) const = 0;
+    virtual Type chck(Defs& defs, SymT& symt) = 0;
+    virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const = 0;\
 };
 
 //
-// ECal - expression call for a function
+// Func - expression call for a function
 //
-class ECal : public Expn {
+class Func : public Expn {
 public:
     Name name;
     Expn_vec args;
-    ECal(Name x, Expn_vec a, Locn l) : Expn {l}, name {x}, args {a} { }
-    virtual ~ECal(void) = default;
+    Func(Name x, Expn_vec a, Locn l) : Expn {l}, name {x}, args {a} { }
+    virtual ~Func(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -480,6 +480,7 @@ public:
         : Expn {lo}, left {lf}, rght {rg} { }
     virtual ~Plus(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -495,6 +496,7 @@ public:
         : Expn {lo}, left {lf}, rght {rg} { }
     virtual ~Conj(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -507,6 +509,7 @@ public:
         : Expn {lo}, left {lf}, rght {rg} { }
     virtual ~Disj(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -519,6 +522,7 @@ public:
         : Expn {lo}, left {lf}, rght {rg} { }
     virtual ~Less(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -531,6 +535,7 @@ public:
         : Expn {lo}, left {lf}, rght {rg} { }
     virtual ~LtEq(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -543,6 +548,7 @@ public:
         : Expn {lo}, left {lf}, rght {rg} { }
     virtual ~Eqal(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -553,6 +559,7 @@ public:
     Negt(Expn_ptr e, Locn lo) : Expn {lo}, expn {e} { }
     virtual ~Negt(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -568,6 +575,7 @@ public:
         : Expn {lo}, left {lf}, rght {rg} { }
     virtual ~Mnus(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -583,6 +591,7 @@ public:
         : Expn {lo}, left {lf}, rght {rg} { }
     virtual ~Tmes(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -598,6 +607,7 @@ public:
         : Expn {lo}, left {lf}, rght {rg} { }
     virtual ~IDiv(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -613,6 +623,7 @@ public:
         : Expn {lo}, left {lf}, rght {rg} { }
     virtual ~IMod(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -626,6 +637,7 @@ public:
     Ltrl(Valu vl, Locn lo) : Expn {lo}, valu {vl} { }
     virtual ~Ltrl(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     // ? add eval to bool
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
@@ -641,6 +653,7 @@ public:
     Lkup(Name nm, Locn lo) : Expn {lo}, name {nm} { }
     virtual ~Lkup(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -654,6 +667,7 @@ public:
     Inpt(Expn_ptr e, Locn lo) : Expn {lo}, expn {e} { }
     virtual ~Inpt(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -667,6 +681,7 @@ public:
     IntC(Expn_ptr e, Locn lo) : Expn {lo}, expn {e} { }
     virtual ~IntC(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };
@@ -680,6 +695,7 @@ public:
     StrC(Expn_ptr e, Locn lo) : Expn {lo}, expn {e} { }
     virtual ~StrC(void) = default;
     virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const;
+    virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
 };

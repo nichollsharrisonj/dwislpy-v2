@@ -477,6 +477,10 @@ WSPC    {INDT}
 <MID_LINE>None {
     return issue(token::Token_NONE,yytext,loc);
 }
+
+<MID_LINE>"->" {
+    return issue(token::Token_ARRW,yytext,loc);
+}
     
 <MID_LINE>{NAME} {
     // Handle identifier names.

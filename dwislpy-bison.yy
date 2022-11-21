@@ -9,6 +9,7 @@
 %code requires{
     
     #include "dwislpy-ast.hh"
+    #include "dwislpy-check.hh"
 
     namespace DWISLPY {
         class Driver;
@@ -75,6 +76,7 @@
 %token               NONE "None"
 %token               TRUE "True"
 %token               FALS "False"
+%token               ARRW "->"
 %token <int>         NMBR
 %token <std::string> NAME
 %token <std::string> STRG
@@ -82,9 +84,9 @@
 %type <Prgm_ptr> prgm
 %type <Expn_vec> prms
 %type <Name_vec> nams
+%type <Blck_ptr> nest
 %type <Defs> defs
 %type <Defn_ptr> defn
-%type <Nest_ptr> nest
 %type <Blck_ptr> blck
 %type <Stmt_vec> stms
 %type <Stmt_ptr> stmt
@@ -129,25 +131,31 @@ defs:
   }
 ;
 
+// old version
 defn:
   DEFN NAME LPAR nams RPAR COLN EOLN nest {
-      Name f = $2;
-      Name_vec p = $4;
-      Nest_ptr n = $8;
-      $$ = Defn_ptr { new Defn {f, p, n, n->where()} };
+      $$ = Defn_ptr { new Defn {$2, $4, $8, lexer.locate(@1)} };
   }
 | DEFN NAME LPAR RPAR COLN EOLN nest {
-      Name f = $2;
-      Name_vec p = { };
-      Nest_ptr n = $7;
-      $$ = Defn_ptr { new Defn {f, p, n, n->where()} };
+      Name_vec no_frmls = { };
+      $$ = Defn_ptr { new Defn {$2, no_frmls, $7, lexer.locate(@1)} };
   }
 ;
 
+/*
+defn:
+  DEFN NAME LPAR nams RPAR ARRW type COLN EOLN nest {
+      $$ = Defn_ptr { new Defn {$2, $4, $7, $10, lexer.locate(@1)} };
+  }
+| DEFN NAME LPAR RPAR ARRW type COLN EOLN nest {
+      SymT no_frmls = { };
+      $$ = Defn_ptr { new Defn {$2, no_frmls, $6, $9, lexer.locate(@1)} };
+  }
+;
+*/
 nest:
   INDT blck DEDT {
-      Blck_ptr b = $2;
-      $$ = Nest_ptr { new Nest {b, b->where()} };
+      $$ = $2;
   }
 ;
 
@@ -208,11 +216,11 @@ stmt:
       $$ = MiEq_ptr { new MiEq {$1,$3,lexer.locate(@2)} };
   }
 | NAME LPAR prms RPAR EOLN {
-      $$ = SCal_ptr { new SCal {$1,$3,lexer.locate(@2)} };
+      $$ = Proc_ptr { new Proc {$1,$3,lexer.locate(@2)} };
   }
 | NAME LPAR RPAR EOLN {
       Expn_vec a = { };
-      $$ = SCal_ptr { new SCal {$1,a,lexer.locate(@2)} };
+      $$ = Proc_ptr { new Proc {$1,a,lexer.locate(@2)} };
   }
 | PASS EOLN {
       $$ = Pass_ptr { new Pass {lexer.locate(@1)} };
@@ -240,11 +248,11 @@ stmt:
 
 expn:
   NAME LPAR prms RPAR {
-      $$ = ECal_ptr { new ECal {$1,$3,lexer.locate(@2)} };
+      $$ = Func_ptr { new Func {$1,$3,lexer.locate(@2)} };
   }
 | NAME LPAR RPAR {
       Expn_vec a = { };
-      $$ = ECal_ptr { new ECal {$1,a,lexer.locate(@2)} };
+      $$ = Func_ptr { new Func {$1,a,lexer.locate(@2)} };
   }
 |  expn PLUS expn {
       $$ = Plus_ptr { new Plus {$1,$3,lexer.locate(@2)} };

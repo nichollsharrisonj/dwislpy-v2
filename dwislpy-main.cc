@@ -101,7 +101,16 @@ void DWISLPY::Driver::run(void) {
     main->run();
 }
 
-// run
+// check
+//
+// Checks the DwiSlpy program.
+//
+void DWISLPY::Driver::check(void) {
+    main->chck();
+}
+
+
+// dump
 //
 // Outputs the DwiSlpy program, either by depicting its AST, or by
 // a "pretty" version that mimics the original source code.
