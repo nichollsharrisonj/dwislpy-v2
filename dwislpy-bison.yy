@@ -77,20 +77,22 @@
 %token               TRUE "True"
 %token               FALS "False"
 %token               ARRW "->"
+%token               BOOL "bool"
 %token <int>         NMBR
 %token <std::string> NAME
 %token <std::string> STRG
 
 %type <Prgm_ptr> prgm
 %type <Expn_vec> prms
-%type <Name_vec> nams
 %type <Blck_ptr> nest
-%type <Defs> defs
+%type <Type>     type
+%type <Defs>     defs
 %type <Defn_ptr> defn
 %type <Blck_ptr> blck
 %type <Stmt_vec> stms
 %type <Stmt_ptr> stmt
 %type <Expn_ptr> expn
+%type <SymT>     fmls
 
 %%
 
@@ -131,28 +133,31 @@ defs:
   }
 ;
 
-// old version
-defn:
-  DEFN NAME LPAR nams RPAR COLN EOLN nest {
-      $$ = Defn_ptr { new Defn {$2, $4, $8, lexer.locate(@1)} };
+type:
+  INTC {
+    $$ = IntTy {};
   }
-| DEFN NAME LPAR RPAR COLN EOLN nest {
-      Name_vec no_frmls = { };
-      $$ = Defn_ptr { new Defn {$2, no_frmls, $7, lexer.locate(@1)} };
+| STRC {
+    $$ = StrTy {};
+  }
+| BOOL {
+    $$ = BoolTy {};
+  }
+| NONE {
+    $$ = NoneTy {};
   }
 ;
 
-/*
 defn:
-  DEFN NAME LPAR nams RPAR ARRW type COLN EOLN nest {
+  DEFN NAME LPAR fmls RPAR ARRW type COLN EOLN nest {
       $$ = Defn_ptr { new Defn {$2, $4, $7, $10, lexer.locate(@1)} };
   }
 | DEFN NAME LPAR RPAR ARRW type COLN EOLN nest {
-      SymT no_frmls = { };
-      $$ = Defn_ptr { new Defn {$2, no_frmls, $6, $9, lexer.locate(@1)} };
+      SymT frmls = { };
+      $$ = Defn_ptr { new Defn {$2, frmls, $6, $9, lexer.locate(@1)} };
   }
 ;
-*/
+
 nest:
   INDT blck DEDT {
       $$ = $2;
@@ -179,16 +184,16 @@ prms:
   }
 ;
 
-nams: 
-  nams COMA NAME  {
-      Name_vec as = $1;
-      as.push_back($3);
-      $$ = as;
+fmls:
+  NAME COLN type {
+    SymT st { };
+    st.add_frml($1,$3);
+    $$ = st;
   }
-| NAME {
-      Name_vec as { };
-      as.push_back($1);
-      $$ = as;
+| fmls COMA NAME COLN type {
+    SymT st = $1;
+    st.add_frml($3,$5);
+    $$ = st;
   }
 ;
 
@@ -206,7 +211,10 @@ stms:
 ;
   
 stmt: 
-  NAME ASGN expn EOLN {
+  NAME COLN type ASGN expn EOLN {
+      $$ = Ntro_ptr { new Ntro {$1,$3,$5,lexer.locate(@2)} };
+  }
+|  NAME ASGN expn EOLN {
       $$ = Asgn_ptr { new Asgn {$1,$3,lexer.locate(@2)} };
   }
 | NAME PLEQ expn EOLN {

@@ -121,6 +121,12 @@ std::optional<Valu> Blck::exec(const Defs& defs, Ctxt& ctxt) const {
     return std::nullopt;
 }
 
+// ??? change this
+std::optional<Valu> Ntro::exec(const Defs& defs, Ctxt& ctxt) const {
+    ctxt[name] = expn->eval(defs,ctxt);
+    return std::nullopt;
+}
+
 std::optional<Valu> Asgn::exec(const Defs& defs,
                                Ctxt& ctxt) const {
     ctxt[name] = expn->eval(defs,ctxt);
@@ -198,26 +204,20 @@ std::optional<Valu> Prnt::exec(const Defs& defs, Ctxt& ctxt) const {
     return std::nullopt;
 }
 
-/*
-Valu Defn::call(const Defs& defs, Ctxt& ctxt) const {
-
-}*/
-
-
 std::optional<Valu> Proc::exec(const Defs& defs, Ctxt& ctxt) const {
 
     for (int i = (int)defs.size()-1; i >= 0; --i) {
         Defn_ptr def = defs[i];
         if (def->name.compare(name) == 0) {
-            if (def->args.size() != args.size()) {
+            if (def->symt.get_frmls_size() != args.size()) {
                 std::string msg = "Incorrect number of args found for function " 
-                    + name + ": expected " + std::to_string(def->args.size()) + ", saw " 
+                    + name + ": expected " + std::to_string(def->symt.get_frmls_size()) + ", saw " 
                     + std::to_string(args.size()) + ".";
                 throw DwislpyError { where(), msg };
             }
 
             Ctxt fctxt = { };
-            for (int i = 0; i < (int)args.size(); ++i) fctxt[def->args[i]] = args[i]->eval(defs,ctxt);
+            for (int i = 0; i < (int)args.size(); ++i) fctxt[def->symt.get_frml(i)->name] = args[i]->eval(defs,ctxt);
             std::optional<Valu> rv = def->blck->exec(defs,fctxt);
             if (rv.has_value()) {
                 return rv;
@@ -277,15 +277,15 @@ Valu Func::eval(const Defs& defs, const Ctxt& ctxt) const {
     for (int i = (int)defs.size()-1; i >= 0; --i) {
         Defn_ptr def = defs[i];
         if (def->name.compare(name) == 0) {
-            if (def->args.size() != args.size()) {
+            if (def->symt.get_frmls_size() != args.size()) {
                 std::string msg = "Incorrect number of args found for function " 
-                    + name + ": expected " + std::to_string(def->args.size()) + ", saw " 
+                    + name + ": expected " + std::to_string(def->symt.get_frmls_size()) + ", saw " 
                     + std::to_string(args.size()) + ".";
                 throw DwislpyError { where(), msg };
             }
 
             Ctxt fctxt = { };
-            for (int i = 0; i < (int)args.size(); ++i) fctxt[def->args[i]] = args[i]->eval(defs,ctxt);
+            for (int i = 0; i < (int)args.size(); ++i) fctxt[def->symt.get_frml(i)->name] = args[i]->eval(defs,ctxt);
             std::optional<Valu> rv = def->blck->exec(defs,fctxt);
             if (rv.has_value()) {
                 return rv.value();
@@ -543,9 +543,9 @@ void Prgm::output(std::ostream& os) const {
 
 void Defn::output(std::ostream& os) const {
     os << "def " << name << "(";
-    for (Name a : args) {
-        os << a;
-        if (a.compare(args.back()) != 0) {
+    for (int i = 0; i < (int)symt.get_frmls_size(); ++i) {
+        os << symt.get_frml(i);
+        if (i != (int)symt.get_frmls_size() - 1) {
             os << ", ";
         }
     }
@@ -567,6 +567,13 @@ void Blck::output(std::ostream& os) const {
 
 void Stmt::output(std::ostream& os) const {
     output(os,"");
+}
+
+void Ntro::output(std::ostream& os, std::string indent) const {
+    os << indent;
+    os << name << " : " << type_name(type) << " = ";
+    expn->output(os);
+    os << std::endl;
 }
 
 void Asgn::output(std::ostream& os, std::string indent) const {
@@ -812,9 +819,9 @@ void Prgm::dump(int level) const {
 void Defn::dump(int level) const {
     dump_indent(level);
     std::cout << "DEFN" << std::endl;
-    for (Name n : args) {
+    for (int i = 0; i < (int)symt.get_frmls_size(); ++i) {
         dump_indent(level+1);
-        std::cout << n << std::endl;
+        std::cout << symt.get_frml(i) << std::endl;
     }
     blck->dump(level+1);
 }
@@ -825,6 +832,16 @@ void Blck::dump(int level) const {
     for (Stmt_ptr stmt : stmts) {
         stmt->dump(level+1);
     }
+}
+
+void Ntro::dump(int level) const {
+    dump_indent(level);
+    std::cout << "NTRO" << std::endl;
+    dump_indent(level+1);
+    std::cout << name << std::endl;
+    dump_indent(level+1);
+    std::cout << type_name(type) << std::endl;
+    expn->dump(level+1);
 }
 
 void Asgn::dump(int level) const {

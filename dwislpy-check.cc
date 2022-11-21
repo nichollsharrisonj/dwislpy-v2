@@ -181,11 +181,10 @@ Rtns Prnt::chck([[maybe_unused]] Rtns expd, Defs& defs, SymT& symt) {
     return Rtns {Void {}};
 }
 
-/*
+
 Rtns Ntro::chck([[maybe_unused]] Rtns expd, Defs& defs, SymT& symt) {
     return Rtns {Void {}}; // Fix this!!
 }
-*/
 
 Rtns Retn::chck(Rtns expd, [[maybe_unused]] Defs& defs, [[maybe_unused]] SymT& symt) {
     // Doesn't check the sub-expression. Fix this!!!

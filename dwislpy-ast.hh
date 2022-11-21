@@ -50,6 +50,7 @@ class Defn; // def
 class Blck;
 //
 class Stmt;
+class Ntro; //
 class Pass;
 class Asgn;
 class Prnt;
@@ -110,6 +111,7 @@ typedef std::shared_ptr<Negt> Negt_ptr;
 
 
 //
+typedef std::shared_ptr<Ntro> Ntro_ptr;
 typedef std::shared_ptr<Whle> Whle_ptr; // while ( ) :
 typedef std::shared_ptr<Tern> Tern_ptr; // if : else : 
 typedef std::shared_ptr<Proc> Proc_ptr; // f (...) 
@@ -207,10 +209,11 @@ class Defn : public AST {
 public:
     //
     Name name;
-    Name_vec args;
+    SymT symt;
+    Type rety;
     Blck_ptr blck;
     //
-    Defn(Name x, Name_vec y, Blck_ptr z, Locn lo) : AST {lo}, name {x}, args {y}, blck {z} { } 
+    Defn(Name nm, SymT sy, Type rt, Blck_ptr bk, Locn lo) : AST {lo}, name {nm}, symt {sy}, rety {rt}, blck {bk} { }
     virtual ~Defn(void) = default;
     //
     virtual void chck(Defs& defs);
@@ -267,6 +270,22 @@ public:
     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt) = 0;
     virtual void output(std::ostream& os, std::string indent) const = 0;
     virtual void output(std::ostream& os) const;
+};
+
+//
+// Ntro - variable introduction with initializer
+//
+class Ntro : public Stmt {
+public:
+    Name name;
+    Type type;
+    Expn_ptr expn;
+    Ntro(Name x, Type t, Expn_ptr e, Locn l) : Stmt {l}, name {x}, type {t}, expn {e} { }
+    virtual ~Ntro(void) = default;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual void output(std::ostream& os, std::string indent) const;
+    virtual void dump(int level = 0) const;
 };
 
 //
