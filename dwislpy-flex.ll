@@ -457,7 +457,11 @@ WSPC    {INDT}
 <MID_LINE>input {
     return issue(token::Token_INPT,yytext,loc);
 }
-    
+
+<MID_LINE>bool {
+    return issue(token::Token_BOOL,yytext,loc);
+}
+      
 <MID_LINE>int {
     return issue(token::Token_INTC,yytext,loc);
 }

@@ -134,7 +134,7 @@ typedef std::shared_ptr<Expn> Expn_ptr;
 typedef std::vector<Stmt_ptr> Stmt_vec;
 typedef std::vector<Expn_ptr> Expn_vec; // params
 typedef std::vector<Name> Name_vec; // param names
-typedef std::vector<Defn_ptr> Defs;
+typedef std::unordered_map<Name,Defn_ptr> Defs;
 //
     
 //
@@ -189,7 +189,9 @@ public:
     SymT main_symt;
     //
     Prgm(Defs ds, Blck_ptr mn, Locn lo) :
-        AST {lo}, defs {ds}, main {mn} { }
+        AST {lo}, defs {ds}, main {mn} { 
+            SymT main_symt = SymT();
+        }
     virtual ~Prgm(void) = default;
     //
     virtual void dump(int level = 0) const;
@@ -213,9 +215,13 @@ public:
     Type rety;
     Blck_ptr blck;
     //
+    unsigned int arity(void) const;
+    Type returns(void) const;
+    SymInfo_ptr formal(int i) const;
+    //
     Defn(Name nm, SymT sy, Type rt, Blck_ptr bk, Locn lo) : AST {lo}, name {nm}, symt {sy}, rety {rt}, blck {bk} { }
     virtual ~Defn(void) = default;
-    //
+    std::optional<Valu> call(const Defs& defs, const Expn_vec& args, const Ctxt& ctxt);
     virtual void chck(Defs& defs);
     virtual void dump(int level = 0) const;
     virtual void output(std::ostream& os) const; // Output formatted code.

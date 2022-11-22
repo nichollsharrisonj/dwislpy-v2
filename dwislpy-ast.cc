@@ -111,6 +111,20 @@ void Prgm::run(void) const {
     main->exec(defs,main_ctxt);
 }
 
+std::optional<Valu> Defn::call(const Defs& defs,
+                               const Expn_vec& args,
+                               const Ctxt& ctxt) {
+    Ctxt locals {};
+    int i=0;
+    for (Expn_ptr expn : args) {
+        std::string local = formal(i)->name;
+        i++;
+        Valu value = expn->eval(defs,ctxt);
+        locals[local] = value;
+    }
+    return blck->exec(defs, locals);
+}
+
 std::optional<Valu> Blck::exec(const Defs& defs, Ctxt& ctxt) const {
     for (Stmt_ptr s : stmts) {
         std::optional<Valu> rv = s->exec(defs,ctxt);
@@ -206,29 +220,23 @@ std::optional<Valu> Prnt::exec(const Defs& defs, Ctxt& ctxt) const {
 
 std::optional<Valu> Proc::exec(const Defs& defs, Ctxt& ctxt) const {
 
-    for (int i = (int)defs.size()-1; i >= 0; --i) {
-        Defn_ptr def = defs[i];
-        if (def->name.compare(name) == 0) {
-            if (def->symt.get_frmls_size() != args.size()) {
-                std::string msg = "Incorrect number of args found for function " 
-                    + name + ": expected " + std::to_string(def->symt.get_frmls_size()) + ", saw " 
-                    + std::to_string(args.size()) + ".";
-                throw DwislpyError { where(), msg };
-            }
-
-            Ctxt fctxt = { };
-            for (int i = 0; i < (int)args.size(); ++i) fctxt[def->symt.get_frml(i)->name] = args[i]->eval(defs,ctxt);
-            std::optional<Valu> rv = def->blck->exec(defs,fctxt);
-            if (rv.has_value()) {
-                return rv;
-            } 
-            return std::nullopt;
-        }
+    if (defs.count(name) == 0) {
+        std::string msg = "Run-time error: procedure '" + name +"'";
+        msg += " is not defined.";
+        throw DwislpyError { where(), msg };
     }
 
+    Defn_ptr def = defs.at(name);
 
-    std::string msg = "No function with name " + name + " found.";
-    throw DwislpyError { where(), msg };
+    if (def->symt.get_frmls_size() != args.size()) {
+        std::string msg = "Incorrect number of args found for function " 
+            + name + ": expected " + std::to_string(def->symt.get_frmls_size()) + ", saw " 
+            + std::to_string(args.size()) + ".";
+        throw DwislpyError { where(), msg };
+    }
+
+    def->call(defs,args,ctxt);
+    return std::nullopt;
 }
 
 std::optional<Valu> Whle::exec(const Defs& defs, Ctxt& ctxt) const {
@@ -257,12 +265,11 @@ std::optional<Valu> Tern::exec(const Defs& defs, Ctxt& ctxt) const {
 }
 
 std::optional<Valu> Retn::exec([[maybe_unused]] const Defs& defs, [[maybe_unused]] Ctxt& ctxt) const {
-    return Valu { };
+    return std::optional<Valu> { Valu { None } };
 }
 
 std::optional<Valu> RetE::exec(const Defs& defs, Ctxt& ctxt) const {
-    Valu e = expn->eval(defs,ctxt);
-    return e;
+    return std::optional<Valu> { expn->eval(defs, ctxt) };
 }
 
 //
@@ -274,28 +281,28 @@ std::optional<Valu> RetE::exec(const Defs& defs, Ctxt& ctxt) const {
 
 Valu Func::eval(const Defs& defs, const Ctxt& ctxt) const {
 
-    for (int i = (int)defs.size()-1; i >= 0; --i) {
-        Defn_ptr def = defs[i];
-        if (def->name.compare(name) == 0) {
-            if (def->symt.get_frmls_size() != args.size()) {
-                std::string msg = "Incorrect number of args found for function " 
-                    + name + ": expected " + std::to_string(def->symt.get_frmls_size()) + ", saw " 
-                    + std::to_string(args.size()) + ".";
-                throw DwislpyError { where(), msg };
-            }
-
-            Ctxt fctxt = { };
-            for (int i = 0; i < (int)args.size(); ++i) fctxt[def->symt.get_frml(i)->name] = args[i]->eval(defs,ctxt);
-            std::optional<Valu> rv = def->blck->exec(defs,fctxt);
-            if (rv.has_value()) {
-                return rv.value();
-            } 
-            return Valu { };
-        }
+    if (defs.count(name) == 0) {
+        std::string msg = "Run-time error: procedure '" + name +"'";
+        msg += " is not defined.";
+        throw DwislpyError { where(), msg };
     }
 
-    std::string msg = "No function with name " + name + " found.";
-    throw DwislpyError { where(), msg };
+    Defn_ptr def = defs.at(name);
+
+    if (def->symt.get_frmls_size() != args.size()) {
+        std::string msg = "Incorrect number of args found for function " 
+            + name + ": expected " + std::to_string(def->symt.get_frmls_size()) + ", saw " 
+            + std::to_string(args.size()) + ".";
+        throw DwislpyError { where(), msg };
+    }
+
+    std::optional<Valu> result = def->call(defs,args,ctxt);
+    if (!result.has_value()) {
+        std::string msg = "Run-time error: no value returned from ";
+        msg += "function '" + name +"'.";
+        throw DwislpyError { where(), msg };
+    }
+    return result.value();
 }
 
 Valu Plus::eval(const Defs& defs, const Ctxt& ctxt) const {
@@ -535,8 +542,8 @@ Bool Plus::pred(const Defs& defs, const Ctxt& ctxt) const {
 //
 
 void Prgm::output(std::ostream& os) const {
-    for (Defn_ptr defn : defs) {
-        defn->output(os);
+    for (std::pair<Name,Defn_ptr> defn : defs) {
+        defn.second->output(os);
     }
     main->output(os);
 }
@@ -544,7 +551,7 @@ void Prgm::output(std::ostream& os) const {
 void Defn::output(std::ostream& os) const {
     os << "def " << name << "(";
     for (int i = 0; i < (int)symt.get_frmls_size(); ++i) {
-        os << symt.get_frml(i);
+        os << symt.get_frml(i)->name;
         if (i != (int)symt.get_frmls_size() - 1) {
             os << ", ";
         }
@@ -810,8 +817,8 @@ void dump_indent(int level) {
 void Prgm::dump(int level) const {
     dump_indent(level);
     std::cout << "PRGM" << std::endl;
-    for (Defn_ptr defn : defs) {
-        defn->dump(level+1);
+    for (std::pair<Name,Defn_ptr> defn : defs) {
+        defn.second->dump(level+1);
     }
     main->dump(level+1);
 }
@@ -821,7 +828,7 @@ void Defn::dump(int level) const {
     std::cout << "DEFN" << std::endl;
     for (int i = 0; i < (int)symt.get_frmls_size(); ++i) {
         dump_indent(level+1);
-        std::cout << symt.get_frml(i) << std::endl;
+        std::cout << symt.get_frml(i)->name << std::endl;
     }
     blck->dump(level+1);
 }
@@ -893,7 +900,7 @@ void Tern::dump(int level) const {
 
 void Func::dump(int level) const {
     dump_indent(level);
-    std::cout << "CALL" << std::endl;
+    std::cout << "FUNC" << std::endl;
     dump_indent(level+1);
     std::cout << name << std::endl;
     for (Expn_ptr expn : args) {
@@ -903,7 +910,7 @@ void Func::dump(int level) const {
 
 void Proc::dump(int level) const {
     dump_indent(level);
-    std::cout << "CALL" << std::endl;
+    std::cout << "PROC" << std::endl;
     dump_indent(level+1);
     std::cout << name << std::endl;
     for (Expn_ptr expn : args) {

@@ -159,6 +159,7 @@ int main(int argc, char** argv) {
             if (dump) {
                 dwislpy.dump(pretty);
             } else {
+                dwislpy.check();
                 dwislpy.run();
             }
             

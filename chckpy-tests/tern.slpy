@@ -1,0 +1,10 @@
+
+def f(x : bool) -> int:
+    if (x):
+        return 1
+    else:
+        print(x)
+    return 1
+    
+
+print("Done.")

@@ -211,7 +211,12 @@ public:
     SymInfo_ptr get_frml(int i) const {
         return sym_table.at(formals[i]);
     }
-    unsigned int get_frmls_size(void) const {
+    void print_frmls() const {
+        std::cout << "formals.size() : " <<  formals.size() << std::endl;
+        std::cout << "formals.empty() : " <<  formals.empty() << std::endl;
+        for (std::string s : formals) std::cout << s << std::endl;
+    }
+    unsigned int get_frmls_size() const {
         return formals.size();
     }
 private:
