@@ -210,12 +210,17 @@ stms:
   }
 ;
   
+
+/*
+NAME ASGN expn EOLN {
+      $$ = Asgn_ptr { new Asgn {$1,$3,lexer.locate(@2)} };
+  }
+|
+*/
+
 stmt: 
   NAME COLN type ASGN expn EOLN {
       $$ = Ntro_ptr { new Ntro {$1,$3,$5,lexer.locate(@2)} };
-  }
-|  NAME ASGN expn EOLN {
-      $$ = Asgn_ptr { new Asgn {$1,$3,lexer.locate(@2)} };
   }
 | NAME PLEQ expn EOLN {
       $$ = PlEq_ptr { new PlEq {$1,$3,lexer.locate(@2)} };
