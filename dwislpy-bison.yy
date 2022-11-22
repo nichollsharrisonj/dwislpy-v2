@@ -45,7 +45,6 @@
 %token               EOLN
 %token               INDT
 %token               DEDT
-%token               COLN ":"
 %token               COMA ","
 %token               DEFN "def"
 %token               PASS "pass"
@@ -55,8 +54,6 @@
 %token               ELSE "else"
 %token               PRNT "print"
 %token               INPT "input"
-%token               INTC "int"
-%token               STRC "str"
 %token               ASGN "="
 %token               PLEQ "+="
 %token               MIEQ "-="
@@ -76,8 +73,11 @@
 %token               NONE "None"
 %token               TRUE "True"
 %token               FALS "False"
-%token               ARRW "->"
+%token               ARRW "->"    // for types!
 %token               BOOL "bool"
+%token               INTC "int"
+%token               STRC "str"
+%token               COLN ":"
 %token <int>         NMBR
 %token <std::string> NAME
 %token <std::string> STRG

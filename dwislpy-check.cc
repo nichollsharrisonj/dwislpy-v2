@@ -60,6 +60,18 @@ std::string type_name(Type type) {
     return "wtf";
 }
 
+
+Type type_of(Rtns rtns) {
+    if (std::holds_alternative<VoidOr>(rtns)) {
+        return std::get<VoidOr>(rtns).type;
+    }
+    if (std::holds_alternative<Type>(rtns)) {
+        return std::get<Type>(rtns);
+    }
+    return Type {NoneTy {}}; // Should not happen.
+}
+
+
 /*
 unsigned int Defn::arity(void) const {
     return symt.get_frmls_size();
@@ -101,16 +113,6 @@ void Defn::chck(Defs& defs) {
     if (std::holds_alternative<VoidOr>(rtns)) {
         throw DwislpyError(blck->where(), "Definition body might not return.");
     }
-}
-
-Type type_of(Rtns rtns) {
-    if (std::holds_alternative<VoidOr>(rtns)) {
-        return std::get<VoidOr>(rtns).type;
-    }
-    if (std::holds_alternative<Type>(rtns)) {
-        return std::get<Type>(rtns);
-    }
-    return Type {NoneTy {}}; // Should not happen.
 }
 
 Rtns Blck::chck(Rtns expd, Defs& defs, SymT& symt) {
