@@ -1,10 +1,17 @@
 
-def f(x : bool) -> int:
-    if (x):
-        return 1
-    else:
-        print(x)
-    return 1
-    
+a : bool = True
+
+if (a):
+    print("yes")
+else:
+    print("no")
+
+
+a = False
+
+if (a):
+    print("yes")
+else:
+    print("no")
 
 print("Done.")

@@ -33,6 +33,7 @@
 #include <variant>
 #include "dwislpy-util.hh"
 #include "dwislpy-check.hh"
+#include "dwislpy-inst.hh"
 
 // Valu
 //
@@ -40,6 +41,7 @@
 // Note: the type `none` is defined in *-util.hh.
 //
 typedef std::variant<int, bool, std::string, none> Valu;
+typedef std::optional<Valu> RtnO;
 
 //
 // We "pre-declare" each AST subclass for mutually recursive definitions.
@@ -59,6 +61,7 @@ class Tern; //
 class Updt; //
 class PlEq; //
 class MiEq; //
+class TiEq; //
 class Retn; // return EOLN
 class RetE; // return expn
 class Proc; // f(...) (For calls in statement form)
@@ -76,7 +79,6 @@ class Mnus;
 class Tmes;
 class IDiv;
 class IMod;
-class Less;
 class LsEq;
 class Equl;
 class Inpt;
@@ -121,7 +123,7 @@ typedef std::shared_ptr<Prnt> Prnt_ptr;
 typedef std::shared_ptr<Asgn> Asgn_ptr;
 typedef std::shared_ptr<PlEq> PlEq_ptr; // +=
 typedef std::shared_ptr<MiEq> MiEq_ptr; // -=
-typedef std::shared_ptr<MiEq> MiEq_ptr; // -=
+typedef std::shared_ptr<TiEq> TiEq_ptr; // *=
 typedef std::shared_ptr<Retn> Retn_ptr; // return EOLN
 typedef std::shared_ptr<RetE> RetE_ptr; // return expn
 //
@@ -187,6 +189,8 @@ public:
     Defs defs;
     Blck_ptr main;
     SymT main_symt;
+    SymT_ptr glbl_symt_ptr; // New for Homework 5.
+    INST_vec main_code;     // New for Homework 5.
     //
     Prgm(Defs ds, Blck_ptr mn, Locn lo) :
         AST {lo}, defs {ds}, main {mn} { 
@@ -194,10 +198,12 @@ public:
         }
     virtual ~Prgm(void) = default;
     //
-    virtual void dump(int level = 0) const;
-    virtual void run(void) const; // Execute the program.
     virtual void chck(void);                     // Verify the code.
+    virtual void dump(int level = 0) const;
+    virtual void run(void) const;                // Execute the program.
     virtual void output(std::ostream& os) const; // Output formatted code.
+    virtual void trans(void);                    // Translate to IR. (HW5)
+    virtual void compile(std::ostream& os);      // Generate MIPS. (HW5)
 };
 
 
@@ -214,17 +220,21 @@ public:
     SymT symt;
     Type rety;
     Blck_ptr blck;
+    INST_vec code; // New for Homework 5.
+    //
+    Defn(Name nm, SymT sy, Type rt, Blck_ptr bk, Locn lo) : 
+        AST {lo}, name {nm}, symt {sy}, rety {rt}, blck {bk} { }
+    virtual ~Defn(void) = default;
     //
     unsigned int arity(void) const;
     Type returns(void) const;
     SymInfo_ptr formal(int i) const;
     //
-    Defn(Name nm, SymT sy, Type rt, Blck_ptr bk, Locn lo) : AST {lo}, name {nm}, symt {sy}, rety {rt}, blck {bk} { }
-    virtual ~Defn(void) = default;
     std::optional<Valu> call(const Defs& defs, const Expn_vec& args, const Ctxt& ctxt);
     virtual void chck(Defs& defs);
     virtual void dump(int level = 0) const;
     virtual void output(std::ostream& os) const; // Output formatted code.
+    virtual void trans(void); // Generate IR code. (HW5)
 };
 
 //
@@ -242,6 +252,7 @@ public:
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code);
 };
 
 
@@ -276,6 +287,7 @@ public:
     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt) = 0;
     virtual void output(std::ostream& os, std::string indent) const = 0;
     virtual void output(std::ostream& os) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code) = 0; // Generate IR code. (HW5)
 };
 
 //
@@ -286,12 +298,14 @@ public:
     Name name;
     Type type;
     Expn_ptr expn;
-    Ntro(Name x, Type t, Expn_ptr e, Locn l) : Stmt {l}, name {x}, type {t}, expn {e} { }
+    Ntro(Name x, Type t, Expn_ptr e, Locn l) : 
+        Stmt {l}, name {x}, type {t}, expn {e} { }
     virtual ~Ntro(void) = default;
     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code);
 };
 
 //
@@ -307,6 +321,7 @@ public:
     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code);
 };
 
 //
@@ -322,6 +337,7 @@ public:
     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code);
 };
 
 //
@@ -336,6 +352,7 @@ public:
     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code);
 };
 
 //
@@ -353,6 +370,7 @@ public:
     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const; 
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code);
 
 };
 
@@ -372,6 +390,7 @@ public:
     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code);
 
 };
 
@@ -387,6 +406,7 @@ public:
     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code);
 };
 
 
@@ -403,6 +423,7 @@ public:
     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code);
 };
 
 //
@@ -418,6 +439,23 @@ public:
     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code);
+};
+
+//
+// TiEq - *= statement AST node
+//
+class TiEq : public Stmt {
+public:
+    Name name;
+    Expn_ptr expn;
+    TiEq(Name n, Expn_ptr e, Locn lo) : Stmt {lo}, name {n}, expn {e} { }
+    virtual ~TiEq(void) = default;
+    virtual std::optional<Valu> exec(const Defs& defs, Ctxt& ctxt) const;
+    virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
+    virtual void output(std::ostream& os, std::string indent) const;
+    virtual void dump(int level = 0) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code);
 };
 
 //
@@ -431,6 +469,7 @@ public:
     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code);
 };
 
 //
@@ -445,6 +484,7 @@ public:
     virtual Rtns chck(Rtns expd, Defs& defs, SymT& symt);
     virtual void output(std::ostream& os, std::string indent) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string exit, SymT& symt, INST_vec& code);
 };
 
 
@@ -473,10 +513,14 @@ public:
 //
 class Expn : public AST {
 public:
+    Type type; // Need this for translation into IR. (HW5)
     Expn(Locn lo) : AST {lo} { }
     virtual ~Expn(void) = default;
     virtual Type chck(Defs& defs, SymT& symt) = 0;
-    virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const = 0;\
+    virtual Valu eval(const Defs& defs, const Ctxt& ctxt) const = 0;
+    virtual void trans(Name dest, SymT& symt, INST_vec& code) = 0;
+    virtual void trans_cndn(std::string then_lbl, std::string else_lbl, SymT& symt, INST_vec& code); // Generate IR (HW5)
+          
 };
 
 //
@@ -492,6 +536,8 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
+    virtual void trans_cndn(std::string then_lbl, std::string else_lbl, SymT& symt, INST_vec& code);
 };
 
 //
@@ -508,6 +554,7 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
 };
 
 //
@@ -524,6 +571,8 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
+    virtual void trans_cndn(std::string then_lbl, std::string else_lbl, SymT& symt, INST_vec& code);
 };
 
 class Disj : public Expn {
@@ -537,6 +586,8 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
+    virtual void trans_cndn(std::string then_lbl, std::string else_lbl, SymT& symt, INST_vec& code);
 };
 
 class Less : public Expn {
@@ -550,6 +601,8 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
+    virtual void trans_cndn(std::string then_lbl, std::string else_lbl, SymT& symt, INST_vec& code);
 };
 
 class LtEq : public Expn {
@@ -563,6 +616,8 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
+    virtual void trans_cndn(std::string then_lbl, std::string else_lbl, SymT& symt, INST_vec& code);
 };
 
 class Eqal : public Expn {
@@ -576,6 +631,8 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
+    virtual void trans_cndn(std::string then_lbl, std::string else_lbl, SymT& symt, INST_vec& code);
 };
 
 class Negt : public Expn {
@@ -587,6 +644,8 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
+    virtual void trans_cndn(std::string then_lbl, std::string else_lbl, SymT& symt, INST_vec& code);
 };
 
 //
@@ -603,6 +662,7 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
 };
 
 //
@@ -619,6 +679,7 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
 };
 
 //
@@ -635,6 +696,7 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
 };
 
 //
@@ -651,6 +713,7 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
 };
 
 //
@@ -666,6 +729,8 @@ public:
     // ? add eval to bool
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
+    virtual void trans_cndn(std::string then_lbl, std::string else_lbl, SymT& symt, INST_vec& code);
 };
 
 
@@ -681,6 +746,8 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
+    virtual void trans_cndn(std::string then_lbl, std::string else_lbl, SymT& symt, INST_vec& code);
 };
 
 //
@@ -695,6 +762,7 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
 };
 
 //
@@ -709,6 +777,7 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
 };
 
 //
@@ -723,6 +792,7 @@ public:
     virtual Type chck(Defs& defs, SymT& symt);
     virtual void output(std::ostream& os) const;
     virtual void dump(int level = 0) const;
+    virtual void trans(std::string dest, SymT& symt, INST_vec& code);
 };
 
 #endif

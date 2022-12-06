@@ -57,12 +57,13 @@ namespace DWISLPY {
         void parse(void);
         void run(void);
         void check(void);
+        void compile(void);
         void dump(bool pretty);
-        void set(Prgm_ptr prgm) { main = prgm; }
+        void set(Prgm_ptr prgm) { program = prgm; }
         std::string src_name;
     private:
         istream_ptr src_stream = nullptr;
-        Prgm_ptr    main = nullptr;
+        Prgm_ptr    program = nullptr;
         Lexer_ptr   lexer = nullptr;
         Parser_ptr  parser  = nullptr;
     };

@@ -200,6 +200,30 @@ std::optional<Valu> MiEq::exec(const Defs& defs,
     return std::nullopt;
 }
 
+std::optional<Valu> TiEq::exec(const Defs& defs,
+                               Ctxt& ctxt) const {
+    // from Lkup
+    if (ctxt.count(name) <= 0) {
+        std::string msg = "Run-time error: variable '" + name +"'";
+        msg += "not defined.";
+        throw DwislpyError { where(), msg };
+    }
+
+    Valu n = ctxt.at(name);
+    Valu e = expn->eval(defs,ctxt);
+    
+    if (std::holds_alternative<int>(e) &&
+        std::holds_alternative<int>(n)) {
+        int in = std::get<int>(n);
+        int ie = std::get<int>(e);
+        ctxt[name] = Valu {in * ie};
+    } else {
+        std::string msg = "Run-time error: wrong operand type for times equals.";
+        throw DwislpyError { where(), msg };
+    }        
+    return std::nullopt;
+}
+
 std::optional<Valu> Pass::exec([[maybe_unused]] const Defs& defs,
                                [[maybe_unused]] Ctxt& ctxt) const {
     // does nothing!
@@ -624,6 +648,14 @@ void MiEq::output(std::ostream& os, std::string indent) const {
     os << std::endl;
 }
 
+void TiEq::output(std::ostream& os, std::string indent) const {
+    os << indent;
+    os << name;
+    os << " *= ";
+    expn->output(os);
+    os << std::endl;
+}
+
 void Whle::output(std::ostream& os, std::string indent) const {
     os << indent;
     os << "while";
@@ -876,6 +908,14 @@ void PlEq::dump(int level) const {
 }
 
 void MiEq::dump(int level) const {
+    dump_indent(level);
+    std::cout << "MIEQ" << std::endl;
+    dump_indent(level+1);
+    std::cout << name << std::endl;
+    expn->dump(level+1);
+}
+
+void TiEq::dump(int level) const {
     dump_indent(level);
     std::cout << "MIEQ" << std::endl;
     dump_indent(level+1);

@@ -394,6 +394,10 @@ WSPC    {INDT}
     return issue(token::Token_MIEQ,yytext,loc);
 }
 
+<MID_LINE>"*=" {
+    return issue(token::Token_TIEQ,yytext,loc);
+}
+
 <MID_LINE>"+" {
     return issue(token::Token_PLUS,yytext,loc);
 }

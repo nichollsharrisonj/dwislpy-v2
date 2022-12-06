@@ -177,30 +177,71 @@ public:
     int identifier;
     Type type;
     SymKind kind;
+    int frame_offset;
     SymInfo(std::string nm, Type ty, int id, SymKind kd) :
         name {nm}, identifier {id}, type {ty}, kind {kd} {}
 };
 
+class SymT;
 typedef std::shared_ptr<SymInfo> SymInfo_ptr;
+typedef std::shared_ptr<SymT> SymT_ptr;
 
 //
 // class SymT - convenient cover to a dictionary of Name-SymInfo_ptr pairs.
 //
 class SymT {
 public:
-    SymT() : sym_table {}, formals {} { }
+    std::unordered_map<std::string, std::string> strings;
+    SymT() : sym_table {}, formals {}, globals {nullptr} { }
     std::string add_frml(std::string nm, Type ty) {
         sym_table[nm] = SymInfo_ptr{ new SymInfo {nm, ty, 0, FRML} };
         formals.push_back(nm);
         return nm;
     }
     std::string add_locl(std::string nm, Type ty) {
-        sym_table[nm] = SymInfo_ptr{ new SymInfo {nm, ty, sym_id++, FRML} };
+        sym_table[nm] = SymInfo_ptr{ new SymInfo {nm, ty, sym_id++, LOCL} };
+        locals.push_back(nm);
         return nm;
     }
     std::string add_temp(std::string nm, Type ty) {
         sym_table[nm] = SymInfo_ptr{ new SymInfo {nm, ty, sym_id++, TEMP} };
+        locals.push_back(nm);
         return nm;
+    }
+    std::string add_temp(Type ty) {
+        int id = sym_id++;
+        std::string nm = "temp_" + std::to_string(id);
+        sym_table[nm] = SymInfo_ptr{ new SymInfo {nm, ty, id, TEMP} };
+        locals.push_back(nm);
+        return nm;
+    }
+    void set_parent(SymT_ptr p) {
+        globals = p;
+    }               
+    std::string add_labl(std::string nm) {
+        if (globals == nullptr) {
+            return nm;
+        } else {
+            return globals->add_labl(nm);
+        }
+    }
+    std::string add_labl() {
+        if (globals == nullptr) {
+            int id = sym_id++;
+            std::string nm = "L_" + std::to_string(id);
+            return add_labl(nm);
+        } else {
+            return globals->add_labl();
+        }
+    }
+    std::string add_strg(std::string strg) {
+        if (globals == nullptr) {
+            std::string labl = this->add_labl();
+            strings[labl] = strg;
+            return labl;
+        } else {
+            return globals->add_strg(strg);
+        }
     }
     bool has_info(std::string nm) const {
         return (sym_table.count(nm) > 0);
@@ -208,21 +249,37 @@ public:
     SymInfo_ptr get_info(std::string nm) const {
         return sym_table.at(nm);
     }
+    SymInfo_ptr get_locl(int i) const {
+        return sym_table.at(locals[i]);
+    }
     SymInfo_ptr get_frml(int i) const {
         return sym_table.at(formals[i]);
     }
-    void print_frmls() const {
-        std::cout << "formals.size() : " <<  formals.size() << std::endl;
-        std::cout << "formals.empty() : " <<  formals.empty() << std::endl;
-        for (std::string s : formals) std::cout << s << std::endl;
-    }
-    unsigned int get_frmls_size() const {
+    unsigned int get_frmls_size(void) const {
         return formals.size();
+    }
+    unsigned int get_locls_size(void) const {
+        return locals.size();
+    }
+    void set_frame_offset(std::string nm, int offset) {
+        get_info(nm)->frame_offset = offset;
+    }
+    int get_frame_offset(std::string nm) const {
+        return get_info(nm)->frame_offset;
+    }
+    void set_frame_size(int sz) {
+        frame_size = sz;
+    }
+    int get_frame_size(void) const {
+        return frame_size;
     }
 private:
     std::unordered_map<std::string, SymInfo_ptr> sym_table;
     std::vector<std::string> formals;
+    std::vector<std::string> locals;
+    SymT_ptr globals;
     int sym_id = 0;
+    int frame_size;
 };
 
 #endif

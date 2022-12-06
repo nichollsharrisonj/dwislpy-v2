@@ -57,6 +57,7 @@
 %token               ASGN "="
 %token               PLEQ "+="
 %token               MIEQ "-="
+%token               TIEQ "*="
 %token               PLUS "+"
 %token               MNUS "-"
 %token               TMES "*"
@@ -164,6 +165,9 @@ nest:
   INDT blck DEDT {
       $$ = $2;
   }
+| INDT blck EOFL {
+      $$ = $2;
+  }
 ;
 
 blck:
@@ -224,6 +228,9 @@ stmt:
   }
 | NAME MIEQ expn EOLN {
       $$ = MiEq_ptr { new MiEq {$1,$3,lexer.locate(@2)} };
+  }
+| NAME TIEQ expn EOLN {
+      $$ = TiEq_ptr { new TiEq {$1,$3,lexer.locate(@2)} };
   }
 | NAME LPAR prms RPAR EOLN {
       $$ = Proc_ptr { new Proc {$1,$3,lexer.locate(@2)} };

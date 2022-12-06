@@ -1,9 +1,19 @@
 
-def func(x : int) -> int:
-    if x: 
-        print("No return here")
-    else:
-        return 3
+def p(b : bool) -> None:
+    print(b)
+    return
 
-x : int = func(1)
-print("Done.")
+def f(x : int, y : int, z : int, w : int) -> int:
+    return (x + y + z) * w
+    
+def cond(b : int) -> bool:
+    return not (not b)
+
+p(True)    
+print(f(1,3,5,1-2))
+
+
+if (cond(1)):
+    print("True")
+else:
+    print("False")

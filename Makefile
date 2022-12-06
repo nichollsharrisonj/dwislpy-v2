@@ -1,5 +1,5 @@
 UNAME := $(shell uname)
-TARGET=dwislpy
+TARGET=dwislpyc
 CXX=clang++
 YACCFLAGS=-d -v
 ifeq ($(UNAME), Darwin)
@@ -19,7 +19,7 @@ OBJ=$(SRC:.cc=.o)
 
 all:  $(TARGET)
 
-dwislpy: dwislpy-flex.o dwislpy-bison.tab.o dwislpy-main.o dwislpy-ast.o dwislpy-check.o dwislpy-util.o 
+dwislpyc: dwislpy-flex.o dwislpy-bison.tab.o dwislpyc.o dwislpy-ast.o dwislpy-check.o dwislpy-inst.o dwislpy-mips.o dwislpy-util.o 
 		$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^
 
 lexer: dwislpy-flex.cc

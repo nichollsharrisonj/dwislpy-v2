@@ -1,0 +1,8 @@
+a : int = 1
+print(a)
+b : int = 3
+print(a)
+print(b)
+c : int = a + b
+print(a + b)
+print(c)

@@ -267,6 +267,20 @@ Rtns MiEq::chck([[maybe_unused]] Rtns expd, Defs& defs, SymT& symt) {
     return Rtns {Void {}};
 }
 
+Rtns TiEq::chck([[maybe_unused]] Rtns expd, Defs& defs, SymT& symt) {
+    if (!symt.has_info(name)) {
+        throw DwislpyError(where(), "Variable '" + name + "' never introduced.");
+    }
+    Type name_ty = symt.get_info(name)->type;
+    Type expn_ty = expn->chck(defs,symt);
+    if (name_ty != expn_ty) {
+        std::string msg = "Type mismatch. Expected expression of type ";
+        msg += type_name(name_ty) + ".";
+        throw DwislpyError {expn->where(), msg};
+    }
+    return Rtns {Void {}};
+}
+
 Rtns Pass::chck([[maybe_unused]] Rtns expd,
                 [[maybe_unused]] Defs& defs,
                 [[maybe_unused]] SymT& symt) {
@@ -284,12 +298,11 @@ Rtns Prnt::chck([[maybe_unused]] Rtns expd, Defs& defs, SymT& symt) {
 Rtns Ntro::chck([[maybe_unused]] Rtns expd, Defs& defs, SymT& symt) {
 
     symt.add_locl(name, type);
-
-    Type name_ty = symt.get_info(name)->type;
+    Type name_ty = type;
     Type expn_ty = expn->chck(defs,symt);
     if (name_ty != expn_ty) {
         std::string msg = "Type mismatch. Expected expression of type ";
-        msg += type_name(name_ty) + ".";
+        msg += type_name(name_ty) + ". Saw " + type_name(expn_ty) + ".";
         throw DwislpyError {expn->where(), msg};
     }
     return Rtns {Void {}};
@@ -416,16 +429,19 @@ Type Func::chck(Defs& defs, SymT& symt) {
             throw DwislpyError { where(), msg };
         }
     }
-    return def->rety;
+    type = def->rety;
+    return type;
 }
 
 Type Plus::chck(Defs& defs, SymT& symt) {
     Type left_ty = left->chck(defs,symt);
     Type rght_ty = rght->chck(defs,symt);
     if (is_int(left_ty) && is_int(rght_ty)) {
-        return Type {IntTy {}};
+        type = Type {IntTy {}};
+        return type;
     } else if (is_str(left_ty) && is_str(rght_ty)) {
-        return Type {StrTy {}};
+        type = Type {StrTy {}};
+        return type;
     } else {
         std::string msg = "Wrong operand types for plus.";
         throw DwislpyError { where(), msg };
@@ -436,7 +452,8 @@ Type Mnus::chck(Defs& defs, SymT& symt) {
     Type left_ty = left->chck(defs,symt);
     Type rght_ty = rght->chck(defs,symt);
     if (is_int(left_ty) && is_int(rght_ty)) {
-        return Type {IntTy {}};
+        type = Type {IntTy {}};
+        return type;
     } else {
         std::string msg = "Wrong operand types for minus.";
         throw DwislpyError { where(), msg };
@@ -447,7 +464,8 @@ Type Tmes::chck(Defs& defs, SymT& symt) {
     Type left_ty = left->chck(defs,symt);
     Type rght_ty = rght->chck(defs,symt);
     if (is_int(left_ty) && is_int(rght_ty)) {
-        return Type {IntTy {}};
+        type = Type {IntTy {}};
+        return type;
     } else {
         std::string msg = "Wrong operand types for times.";
         throw DwislpyError { where(), msg };
@@ -458,7 +476,8 @@ Type IDiv::chck( Defs& defs, SymT& symt) {
     Type left_ty = left->chck(defs,symt);
     Type rght_ty = rght->chck(defs,symt);
     if (is_int(left_ty) && is_int(rght_ty)) {
-        return Type {IntTy {}};
+        type = Type {IntTy {}};
+        return type;
     } else {
         std::string msg = "Wrong operand types for iDiv.";
         throw DwislpyError { where(), msg };
@@ -469,7 +488,8 @@ Type IMod::chck( Defs& defs, SymT& symt) {
     Type left_ty = left->chck(defs,symt);
     Type rght_ty = rght->chck(defs,symt);
     if (is_int(left_ty) && is_int(rght_ty)) {
-        return Type {IntTy {}};
+        type = Type {IntTy {}};
+        return type;
     } else {
         std::string msg = "Wrong operand types for imod.";
         throw DwislpyError { where(), msg };
@@ -480,7 +500,8 @@ Type Less::chck(Defs& defs, SymT& symt) {
     Type left_ty = left->chck(defs,symt);
     Type rght_ty = rght->chck(defs,symt);
     if (is_int(left_ty) && is_int(rght_ty)) {
-        return Type {BoolTy {}};
+        type = Type {BoolTy {}};
+	    return type;
     } else {
         std::string msg = "Wrong operand types for less.";
         throw DwislpyError { where(), msg };
@@ -491,7 +512,8 @@ Type LtEq::chck( Defs& defs,  SymT& symt) {
     Type left_ty = left->chck(defs,symt);
     Type rght_ty = rght->chck(defs,symt);
     if (is_int(left_ty) && is_int(rght_ty)) {
-        return Type {BoolTy {}};
+        type = Type {BoolTy {}};
+	    return type;
     } else {
         std::string msg = "Wrong operand types for less than or equal to.";
         throw DwislpyError { where(), msg };
@@ -503,60 +525,67 @@ Type Eqal::chck(Defs& defs, SymT& symt) {
     [[maybe_unused]] Type left_ty = left->chck(defs,symt);
     [[maybe_unused]] Type rght_ty = rght->chck(defs,symt);
     // always a bool
-    return Type {BoolTy {}};
+    type = Type {BoolTy {}};
+	return type;
 }
 
 Type Conj::chck( Defs& defs,  SymT& symt) {
     [[maybe_unused]] Type left_ty = left->chck(defs,symt);
     [[maybe_unused]] Type rght_ty = rght->chck(defs,symt);
     //We want to check the subexpressions, but we don't care about their type for conjunction
-    return Type {BoolTy {}}; 
+    type = Type {BoolTy {}}; 
+	return type;
 }
 
 Type Disj::chck(Defs& defs, SymT& symt) {
     [[maybe_unused]] Type left_ty = left->chck(defs,symt);
     [[maybe_unused]] Type rght_ty = rght->chck(defs,symt);
     //We want to check the subexpressions, but we don't care about their type for conjunction
-    return Type {BoolTy {}}; 
+    type = Type {BoolTy {}}; 
+	return type;
 }
 
 Type Negt::chck(Defs& defs, SymT& symt) {
     [[maybe_unused]] Type expn_ty = expn->chck(defs,symt);
     //We want to check the subexpressions, but we don't care about their type for conjunction
-    return Type {BoolTy {}}; 
+    type = Type {BoolTy {}}; 
+	return type;
 }
 
 Type Ltrl::chck([[maybe_unused]] Defs& defs,[[maybe_unused]]  SymT& symt) {
     if (std::holds_alternative<int>(valu)) {
-        return Type {IntTy {}};
+        type = Type {IntTy {}};
     } else if (std::holds_alternative<std::string>(valu)) {
-        return Type {StrTy {}};
-    } if (std::holds_alternative<bool>(valu)) {
-        return Type {BoolTy {}};
+        type = Type {StrTy {}};
+    } else if (std::holds_alternative<bool>(valu)) {
+        type = Type {BoolTy {}};
     } else {
-        return Type {NoneTy {}};
+        type = Type {NoneTy {}};
     } 
+    return type;
 }
 
 Type Lkup::chck([[maybe_unused]] Defs& defs, [[maybe_unused]] SymT& symt) {
     if (symt.has_info(name)) {
-        return symt.get_info(name)->type;
+        type = symt.get_info(name)->type;
+        return type;
     } else {
         throw DwislpyError {where(), "Unknown identifier."};
     } 
 }
 
 Type Inpt::chck(Defs& defs, SymT& symt) {
-    // Doesn't check subexpressions.
-    // Fix this!!
     Type expn_ty = expn->chck(defs,symt);
     if (is_str(expn_ty)) {
-        return Type {StrTy {}}; 
+        // ??? This next line *should* be 
+        type = Type {StrTy {}};
+        // ??? but this language version returns an integer instead.
+        // type = Type {IntTy {}};
+        return type;
     } else {
-        std::string msg = "Wrong expression type for input, expected str.";
+        std::string msg = "Input prompt is not a string.";
         throw DwislpyError { where(), msg };
     }
-    
 }
 
 Type IntC::chck(Defs& defs, SymT& symt) {
@@ -565,7 +594,8 @@ Type IntC::chck(Defs& defs, SymT& symt) {
         std::string msg = "Cannot convert nonetype to int";
         throw DwislpyError { where(), msg };
     }
-    return Type {IntTy {}}; 
+    type = Type {IntTy {}}; 
+    return type;
 }
 
 Type StrC::chck(Defs& defs, SymT& symt) {
@@ -574,6 +604,7 @@ Type StrC::chck(Defs& defs, SymT& symt) {
         std::string msg = "Cannot convert nonetype to str";
         throw DwislpyError { where(), msg };
     }
-    return Type {StrTy {}}; 
+    type = Type {StrTy {}}; 
+	return type;
 }
 
